@@ -1,0 +1,431 @@
+from sqlalchemy import Boolean, Column, Integer, String, Float, DateTime, Date, Text, ForeignKey, Enum
+from sqlalchemy.orm import relationship
+from database import Base
+from datetime import datetime, date
+import enum
+
+class UserRole(str, enum.Enum):
+    ADMIN = "admin"
+    RECEPTION = "reception"
+    SALESMAN = "salesman"
+    SERVICE_ENGINEER = "service_engineer"
+    OFFICE_STAFF = "office_staff"
+    CUSTOMER = "customer"
+
+class User(Base):
+    __tablename__ = "users"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True, nullable=False)
+    email = Column(String, unique=True, index=True)
+    hashed_password = Column(String, nullable=False)
+    full_name = Column(String)
+    role = Column(Enum(UserRole), nullable=False)
+    department = Column(String)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    enquiries = relationship("Enquiry", back_populates="assigned_user", foreign_keys="Enquiry.assigned_to")
+    complaints = relationship("Complaint", back_populates="assigned_engineer")
+    sales_calls = relationship("SalesCall", back_populates="salesman")
+    attendance_records = relationship("Attendance", back_populates="employee")
+    mif_access_logs = relationship("MIFAccessLog", back_populates="user")
+
+class Customer(Base):
+    __tablename__ = "customers"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    customer_id = Column(String, unique=True, index=True)
+    name = Column(String, nullable=False)
+    email = Column(String)
+    phone = Column(String)
+    address = Column(Text)
+    company = Column(String)
+    join_date = Column(DateTime, default=datetime.utcnow)
+    status = Column(String, default="Active")
+    total_purchases = Column(Integer, default=0)
+    total_value = Column(Float, default=0)
+    amc_status = Column(String)
+    amc_expiry = Column(DateTime)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    enquiries = relationship("Enquiry", back_populates="customer")
+    complaints = relationship("Complaint", back_populates="customer")
+    bookings = relationship("Booking", back_populates="customer")
+    mif_records = relationship("MIFRecord", back_populates="customer")
+
+class Enquiry(Base):
+    __tablename__ = "enquiries"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    enquiry_id = Column(String, unique=True, index=True)
+    customer_id = Column(Integer, ForeignKey("customers.id"))
+    product_id = Column(Integer, ForeignKey("products.id"))  # NEW: Link to product
+    customer_name = Column(String, nullable=False)
+    phone = Column(String)
+    email = Column(String)
+    product_interest = Column(String)  # Keep for backward compatibility
+    priority = Column(String, default="WARM")  # HOT, WARM, COLD
+    status = Column(String, default="NEW")
+    source = Column(String, default="website")  # website, call, walk-in
+    assigned_to = Column(Integer, ForeignKey("users.id"))
+    next_follow_up = Column(DateTime)
+    last_follow_up = Column(DateTime)
+    reminder_frequency = Column(String, default="monthly")  # weekly, monthly, future
+    instruction_notes = Column(Text)
+    reminder_sent_date = Column(DateTime)
+    notes = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    created_by = Column(String)
+    
+    # Relationships
+    customer = relationship("Customer", back_populates="enquiries")
+    product = relationship("Product")
+    assigned_user = relationship("User", back_populates="enquiries", foreign_keys=[assigned_to])
+    follow_up_history = relationship("FollowUpHistory", back_populates="enquiry")
+    enquiry_notes = relationship("EnquiryNote", back_populates="enquiry")
+
+class FollowUpHistory(Base):
+    __tablename__ = "follow_up_history"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    enquiry_id = Column(Integer, ForeignKey("enquiries.id"))
+    date = Column(DateTime, default=datetime.utcnow)
+    status = Column(String)
+    notes = Column(Text)
+    updated_by = Column(String)
+    
+    enquiry = relationship("Enquiry", back_populates="follow_up_history")
+
+class SalesFollowUp(Base):
+    __tablename__ = "sales_followups"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    enquiry_id = Column(Integer, ForeignKey("enquiries.id"))
+    salesman_id = Column(Integer, ForeignKey("users.id"))
+    note = Column(Text, nullable=False)
+    followup_date = Column(DateTime, nullable=False)
+    status = Column(String, default="Pending")  # Pending, Completed
+    completed_at = Column(DateTime)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class EnquiryNote(Base):
+    __tablename__ = "enquiry_notes"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    enquiry_id = Column(Integer, ForeignKey("enquiries.id"))
+    note = Column(Text, nullable=False)
+    note_type = Column(String, default="general")  # general, call, meeting, follow_up
+    created_by = Column(Integer, ForeignKey("users.id"))
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    enquiry = relationship("Enquiry", back_populates="enquiry_notes")
+    user = relationship("User")
+
+class Complaint(Base):
+    __tablename__ = "complaints"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    ticket_no = Column(String, unique=True, index=True)
+    customer_id = Column(Integer, ForeignKey("customers.id"))
+    customer_name = Column(String, nullable=False)
+    phone = Column(String)
+    address = Column(Text)
+    machine_model = Column(String)
+    fault_description = Column(Text)
+    priority = Column(String, default="Normal")
+    status = Column(String, default="Assigned")  # Assigned, On the way, Completed, Delayed
+    assigned_to = Column(Integer, ForeignKey("users.id"))
+    sla_time = Column(DateTime)
+    sla_warning_sent = Column(Boolean, default=False)
+    sla_breach_notified = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    completed_at = Column(DateTime)
+    
+    # Relationships
+    customer = relationship("Customer", back_populates="complaints")
+    assigned_engineer = relationship("User", back_populates="complaints")
+
+class Booking(Base):
+    __tablename__ = "bookings"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    booking_id = Column(String, unique=True, index=True)
+    customer_id = Column(Integer, ForeignKey("customers.id"))
+    service_type = Column(String)
+    machine_model = Column(String)
+    description = Column(Text)
+    preferred_date = Column(DateTime)
+    urgency = Column(String, default="normal")
+    status = Column(String, default="Pending")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    customer = relationship("Customer", back_populates="bookings")
+
+class SalesCall(Base):
+    __tablename__ = "sales_calls"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    salesman_id = Column(Integer, ForeignKey("users.id"))
+    customer_name = Column(String)
+    phone = Column(String)
+    call_type = Column(String)  # Cold, Follow-up, Hot
+    outcome = Column(String)
+    notes = Column(Text)
+    call_date = Column(DateTime, default=datetime.utcnow)
+    
+    salesman = relationship("User", back_populates="sales_calls")
+
+class ShopVisit(Base):
+    __tablename__ = "shop_visits"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    salesman_id = Column(Integer, ForeignKey("users.id"))
+    customer_name = Column(String)
+    shop_name = Column(String)
+    shop_address = Column(Text)
+    customer_contact = Column(String)
+    location = Column(String)
+    requirements = Column(Text)
+    requirement_details = Column(Text)
+    product_interest = Column(String)
+    expected_closing = Column(DateTime)
+    follow_up_date = Column(DateTime)
+    follow_up_required = Column(Boolean, default=True)
+    visit_type = Column(String, default="New")
+    notes = Column(Text)
+    visit_date = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class Attendance(Base):
+    __tablename__ = "attendance"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    employee_id = Column(Integer, ForeignKey("users.id"))
+    date = Column(DateTime, default=datetime.utcnow)
+    time = Column(String)
+    location = Column(String)
+    latitude = Column(Float)
+    longitude = Column(Float)
+    photo_path = Column(String)
+    status = Column(String, default="Present")
+    
+    employee = relationship("User", back_populates="attendance_records")
+
+class MIFRecord(Base):
+    __tablename__ = "mif_records"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    mif_id = Column(String, unique=True, index=True)
+    customer_id = Column(Integer, ForeignKey("customers.id"))
+    customer_name = Column(String, nullable=False)
+    machine_model = Column(String)
+    serial_number = Column(String, unique=True)
+    installation_date = Column(DateTime)
+    location = Column(Text)
+    machine_value = Column(Float)
+    amc_status = Column(String)
+    amc_expiry = Column(DateTime)
+    amc_reminder_sent_date = Column(DateTime)
+    last_service = Column(DateTime)
+    next_service = Column(DateTime)
+    services_done = Column(Integer, default=0)
+    status = Column(String, default="Active")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    customer = relationship("Customer", back_populates="mif_records")
+    access_logs = relationship("MIFAccessLog", back_populates="mif_record")
+
+class MIFAccessLog(Base):
+    __tablename__ = "mif_access_logs"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    mif_record_id = Column(Integer, ForeignKey("mif_records.id"))
+    user_id = Column(Integer, ForeignKey("users.id"))
+    action = Column(String)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    ip_address = Column(String)
+    
+    user = relationship("User", back_populates="mif_access_logs")
+    mif_record = relationship("MIFRecord", back_populates="access_logs")
+
+class Product(Base):
+    __tablename__ = "products"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    product_id = Column(String, unique=True, index=True)
+    name = Column(String, nullable=False)
+    category = Column(String)
+    model = Column(String)
+    brand = Column(String)
+    price = Column(Float)
+    stock_quantity = Column(Integer, default=0)
+    description = Column(Text)
+    features = Column(Text)
+    usage_type = Column(String)  # office, school, shop, home
+    image_url = Column(String)
+    specifications = Column(Text)  # JSON string
+    status = Column(String, default="Active")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class Service(Base):
+    __tablename__ = "services"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    service_id = Column(String, unique=True, index=True)
+    name = Column(String, nullable=False)
+    service_type = Column(String)
+    price = Column(Float)
+    duration = Column(String)
+    description = Column(Text)
+    status = Column(String, default="Active")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class Reminder(Base):
+    __tablename__ = "reminders"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    reminder_type = Column(String)  # AMC Expiry, Service Due, Follow-up
+    customer_id = Column(Integer, ForeignKey("customers.id"))
+    due_date = Column(DateTime)
+    priority = Column(String)
+    status = Column(String, default="Pending")
+    notify_to = Column(Text)  # JSON array of user IDs/roles
+    created_at = Column(DateTime, default=datetime.utcnow)
+    sent_at = Column(DateTime)
+
+class Notification(Base):
+    __tablename__ = "notifications"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    notification_type = Column(String)
+    title = Column(String)
+    message = Column(Text)
+    priority = Column(String)
+    module = Column(String)
+    action_url = Column(String)
+    read_status = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    read_at = Column(DateTime)
+
+# NEW MODELS FOR ENHANCED ERP FEATURES
+
+class DailyReport(Base):
+    __tablename__ = "daily_reports"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    salesman_id = Column(Integer, ForeignKey("users.id"))
+    report_date = Column(Date, nullable=False)
+    calls_made = Column(Integer, default=0)
+    shops_visited = Column(Integer, default=0)
+    enquiries_generated = Column(Integer, default=0)
+    sales_closed = Column(Integer, default=0)
+    report_notes = Column(Text)
+    report_submitted = Column(Boolean, default=False)
+    submission_time = Column(DateTime)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    salesman = relationship("User", foreign_keys=[salesman_id])
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    username = Column(String)
+    action = Column(String)  # CREATE, UPDATE, DELETE, VIEW, LOGIN, LOGOUT
+    module = Column(String)  # Enquiry, MIF, Complaint, Customer, etc.
+    record_id = Column(String)
+    record_type = Column(String)
+    changes = Column(Text)  # JSON of what changed
+    ip_address = Column(String)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    
+    user = relationship("User")
+
+class ServiceEngineerHierarchy(Base):
+    __tablename__ = "service_engineer_hierarchy"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    engineer_id = Column(Integer, ForeignKey("users.id"), unique=True)
+    is_incharge = Column(Boolean, default=False)
+    reports_to = Column(Integer, ForeignKey("users.id"))
+    expertise_area = Column(String)  # e.g., "Printer", "Copier", "Scanner"
+    active_cases = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    engineer = relationship("User", foreign_keys=[engineer_id])
+    supervisor = relationship("User", foreign_keys=[reports_to])
+
+class ReminderSchedule(Base):
+    __tablename__ = "reminder_schedules"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    schedule_type = Column(String)  # HOT_ENQUIRY, WARM_ENQUIRY, AMC_EXPIRY, SERVICE_DUE
+    related_id = Column(Integer)  # ID of enquiry, customer, complaint, etc.
+    related_type = Column(String)  # enquiry, customer, complaint
+    next_reminder_date = Column(DateTime)
+    frequency = Column(String)  # weekly, monthly, once
+    last_sent = Column(DateTime)
+    active = Column(Boolean, default=True)
+    read = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+# ORDER MANAGEMENT MODELS
+
+class Order(Base):
+    __tablename__ = "orders"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    order_id = Column(String, unique=True, index=True)
+    enquiry_id = Column(Integer, ForeignKey("enquiries.id"))
+    salesman_id = Column(Integer, ForeignKey("users.id"))
+    customer_id = Column(Integer, ForeignKey("customers.id"))
+    product_id = Column(Integer, ForeignKey("products.id"))
+    customer_name = Column(String, nullable=False)
+    product_name = Column(String, nullable=False)
+    quantity = Column(Integer, nullable=False)
+    unit_price = Column(Float, nullable=False)
+    discount_percent = Column(Float, default=0)
+    discount_amount = Column(Float, default=0)
+    total_amount = Column(Float, nullable=False)
+    expected_delivery_date = Column(DateTime)
+    notes = Column(Text)
+    status = Column(String, default="PENDING")  # PENDING, APPROVED, REJECTED, COMPLETED
+    approved_by = Column(Integer, ForeignKey("users.id"))
+    approved_at = Column(DateTime)
+    rejection_reason = Column(Text)
+    invoice_number = Column(String)
+    invoice_generated = Column(Boolean, default=False)
+    stock_deducted = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    enquiry = relationship("Enquiry")
+    salesman = relationship("User", foreign_keys=[salesman_id])
+    customer = relationship("Customer")
+    product = relationship("Product")
+    approver = relationship("User", foreign_keys=[approved_by])
+
+class SalesDailyReport(Base):
+    __tablename__ = "sales_daily_reports"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    salesman_id = Column(Integer, ForeignKey("users.id"))
+    date = Column(Date, nullable=False, default=date.today)
+    calls_made = Column(Integer, default=0)
+    visits_made = Column(Integer, default=0)
+    enquiries_generated = Column(Integer, default=0)
+    followups_completed = Column(Integer, default=0)
+    orders_created = Column(Integer, default=0)
+    revenue_generated = Column(Float, default=0)
+    remarks = Column(Text)
+    submitted = Column(Boolean, default=False)
+    submitted_at = Column(DateTime)
+    attendance_marked = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    salesman = relationship("User", foreign_keys=[salesman_id])

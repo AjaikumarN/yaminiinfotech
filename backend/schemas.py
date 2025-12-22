@@ -1,0 +1,412 @@
+from pydantic import BaseModel, EmailStr
+from typing import Optional, List
+from datetime import datetime
+from models import UserRole
+
+# User Schemas
+class UserBase(BaseModel):
+    username: str
+    email: Optional[EmailStr] = None
+    full_name: Optional[str] = None
+    role: UserRole
+    department: Optional[str] = None
+
+class UserCreate(UserBase):
+    password: str
+
+class UserUpdate(BaseModel):
+    username: Optional[str] = None
+    email: Optional[EmailStr] = None
+    full_name: Optional[str] = None
+    role: Optional[UserRole] = None
+    department: Optional[str] = None
+    password: Optional[str] = None
+    is_active: Optional[bool] = None
+
+class UserLogin(BaseModel):
+    username: str
+    password: str
+
+class User(UserBase):
+    id: int
+    is_active: bool
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+    user: User
+
+# Customer Schemas
+class CustomerBase(BaseModel):
+    name: str
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    company: Optional[str] = None
+
+class CustomerCreate(CustomerBase):
+    pass
+
+class Customer(CustomerBase):
+    id: int
+    customer_id: str
+    status: str
+    total_purchases: int
+    total_value: float
+    amc_status: Optional[str]
+    amc_expiry: Optional[datetime]
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+# Enquiry Schemas
+class EnquiryBase(BaseModel):
+    customer_name: str
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    product_interest: Optional[str] = None
+    priority: str = "WARM"
+    notes: Optional[str] = None
+
+class EnquiryCreate(EnquiryBase):
+    pass
+
+class EnquiryUpdate(BaseModel):
+    priority: Optional[str] = None
+    status: Optional[str] = None
+    assigned_to: Optional[int] = None
+    next_follow_up: Optional[datetime] = None
+    notes: Optional[str] = None
+
+class Enquiry(EnquiryBase):
+    id: int
+    enquiry_id: str
+    status: str
+    assigned_to: Optional[int]
+    next_follow_up: Optional[datetime]
+    last_follow_up: Optional[datetime]
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+# Complaint Schemas
+class ComplaintBase(BaseModel):
+    customer_name: str
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    machine_model: Optional[str] = None
+    fault_description: str
+    priority: str = "Normal"
+
+class ComplaintCreate(ComplaintBase):
+    customer_id: Optional[int] = None
+
+class ComplaintUpdate(BaseModel):
+    status: Optional[str] = None
+    assigned_to: Optional[int] = None
+
+class Complaint(ComplaintBase):
+    id: int
+    ticket_no: str
+    status: str
+    assigned_to: Optional[int]
+    sla_time: datetime
+    created_at: datetime
+    completed_at: Optional[datetime]
+    
+    class Config:
+        from_attributes = True
+
+# Booking Schemas
+class BookingBase(BaseModel):
+    service_type: str
+    machine_model: Optional[str] = None
+    description: str
+    preferred_date: datetime
+    urgency: str = "normal"
+
+class BookingCreate(BookingBase):
+    customer_id: Optional[int] = None
+
+class Booking(BookingBase):
+    id: int
+    booking_id: str
+    status: str
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+# MIF Schemas
+class MIFRecordBase(BaseModel):
+    customer_name: str
+    machine_model: str
+    serial_number: str
+    installation_date: datetime
+    location: str
+    machine_value: float
+    amc_status: Optional[str]
+    amc_expiry: Optional[datetime]
+
+class MIFRecordCreate(MIFRecordBase):
+    customer_id: Optional[int] = None
+
+class MIFRecord(MIFRecordBase):
+    id: int
+    mif_id: str
+    last_service: Optional[datetime]
+    next_service: Optional[datetime]
+    services_done: int
+    status: str
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class MIFAccessLogCreate(BaseModel):
+    action: str
+    ip_address: Optional[str] = None
+
+# Sales Schemas
+class SalesCallCreate(BaseModel):
+    customer_name: str
+    phone: str
+    call_type: str
+    outcome: str
+    notes: Optional[str] = None
+
+class ShopVisitCreate(BaseModel):
+    customer_name: str
+    shop_name: Optional[str] = None
+    shop_address: Optional[str] = None
+    customer_contact: Optional[str] = None
+    location: str
+    requirements: str
+    requirement_details: Optional[str] = None
+    product_interest: Optional[str] = None
+    expected_closing: Optional[datetime] = None
+    follow_up_date: Optional[datetime] = None
+    visit_type: str = "New"
+    notes: Optional[str] = None
+
+# Attendance Schema
+class AttendanceCreate(BaseModel):
+    time: str
+    location: str
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    photo_path: Optional[str] = None
+    status: str = "Present"
+
+# Follow-up Schemas
+class FollowUpCreate(BaseModel):
+    enquiry_id: int
+    note: str
+    followup_date: datetime
+    status: str = "Pending"
+
+class FollowUpUpdate(BaseModel):
+    status: Optional[str] = None
+    completed_at: Optional[datetime] = None
+
+class FollowUp(BaseModel):
+    id: int
+    enquiry_id: int
+    salesman_id: int
+    note: str
+    followup_date: datetime
+    status: str
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+# Daily Report Schemas
+class DailyReportCreate(BaseModel):
+    report_date: datetime
+    calls_made: int = 0
+    shops_visited: int = 0
+    enquiries_generated: int = 0
+    sales_closed: int = 0
+    report_notes: Optional[str] = None
+
+class DailyReport(BaseModel):
+    id: int
+    salesman_id: int
+    report_date: datetime
+    calls_made: int
+    shops_visited: int
+    enquiries_generated: int
+    sales_closed: int
+    report_notes: Optional[str]
+    report_submitted: bool
+    submission_time: Optional[datetime]
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+# Product & Service Schemas
+class ProductCreate(BaseModel):
+    name: str
+    category: str
+    model: Optional[str] = None
+    brand: Optional[str] = None
+    price: float
+    stock_quantity: int = 0
+    description: Optional[str] = None
+    features: Optional[str] = None
+
+class ServiceCreate(BaseModel):
+    name: str
+    service_type: str
+    price: float
+    duration: str
+    description: Optional[str] = None
+
+# Notification Schema
+class NotificationCreate(BaseModel):
+    user_id: int
+    notification_type: str
+    title: str
+    message: str
+    priority: str
+    module: str
+    action_url: Optional[str] = None
+
+class Notification(BaseModel):
+    id: int
+    notification_type: str
+    title: str
+    message: str
+    priority: str
+    module: str
+    action_url: Optional[str]
+    read: bool
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+# Order Schemas
+class OrderCreate(BaseModel):
+    enquiry_id: int
+    quantity: int
+    expected_delivery_date: Optional[datetime] = None
+    discount_percent: float = 0
+    notes: Optional[str] = None
+
+class OrderUpdate(BaseModel):
+    quantity: Optional[int] = None
+    expected_delivery_date: Optional[datetime] = None
+    discount_percent: Optional[float] = None
+    notes: Optional[str] = None
+
+class OrderApprove(BaseModel):
+    approved: bool
+    rejection_reason: Optional[str] = None
+
+class Order(BaseModel):
+    id: int
+    order_id: str
+    enquiry_id: int
+    salesman_id: int
+    customer_id: int
+    product_id: int
+    customer_name: str
+    product_name: str
+    quantity: int
+    unit_price: float
+    discount_percent: float
+    discount_amount: float
+    total_amount: float
+    expected_delivery_date: Optional[datetime]
+    notes: Optional[str]
+    status: str
+    approved_by: Optional[int]
+    approved_at: Optional[datetime]
+    rejection_reason: Optional[str]
+    invoice_number: Optional[str]
+    invoice_generated: bool
+    stock_deducted: bool
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+# Sales Daily Report Schemas
+class SalesDailyReportCreate(BaseModel):
+    date: datetime
+    calls_made: int = 0
+    visits_made: int = 0
+    enquiries_generated: int = 0
+    followups_completed: int = 0
+    orders_created: int = 0
+    revenue_generated: float = 0
+    remarks: Optional[str] = None
+
+class SalesDailyReportUpdate(BaseModel):
+    calls_made: Optional[int] = None
+    visits_made: Optional[int] = None
+    enquiries_generated: Optional[int] = None
+    followups_completed: Optional[int] = None
+    orders_created: Optional[int] = None
+    revenue_generated: Optional[float] = None
+    remarks: Optional[str] = None
+
+class SalesDailyReportResponse(BaseModel):
+    id: int
+    salesman_id: int
+    date: datetime
+    calls_made: int
+    visits_made: int
+    enquiries_generated: int
+    followups_completed: int
+    orders_created: int
+    revenue_generated: float
+    remarks: Optional[str]
+    submitted: bool
+    submitted_at: Optional[datetime]
+    attendance_marked: bool
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+# Salesman Analytics Schemas
+class SalesmanAnalytics(BaseModel):
+    assigned_enquiries: int
+    pending_followups: int
+    converted_enquiries: int
+    revenue_this_month: float
+    missed_followups: int
+    orders_pending_approval: int
+    conversion_rate: float
+    avg_closing_days: float
+
+class SalesmanPerformance(BaseModel):
+    salesman_id: int
+    salesman_name: str
+    assigned: int
+    converted: int
+    conversion_rate: float
+    revenue: float
+    avg_closing_days: float
+    missed_followups: int
+    visit_count: int
+    lost_count: int
+
+class SalesFunnelData(BaseModel):
+    new: int
+    contacted: int
+    followup: int
+    quoted: int
+    converted: int
+    lost: int
+

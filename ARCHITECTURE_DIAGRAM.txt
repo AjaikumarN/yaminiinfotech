@@ -1,0 +1,284 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                    YAMINI INFOTECH ERP SYSTEM ARCHITECTURE                  ║
+║              Public Customer Portal & Internal Staff Access Model           ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│                           🌐 PUBLIC WEBSITE                                 │
+│                       (No Authentication Required)                          │
+├────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────┐              │
+│  │  HEADER: LOGO  Products  Services  Contact  🔐 Staff Login │              │
+│  └─────────────────────────────────────────────────────────┘              │
+│                                                                             │
+│  PUBLIC ROUTES:                                                             │
+│  ├─ /                      → Home page                                     │
+│  ├─ /products              → Product catalog                               │
+│  ├─ /products/:id          → Product details                               │
+│  ├─ /contact               → Contact form                                  │
+│  ├─ /about                 → About us                                      │
+│  ├─ /blog                  → Blog posts                                    │
+│  └─ /enquiry/:productId    → Submit enquiry (auto-creates customer)       │
+│                                                                             │
+│  CUSTOMER EXPERIENCE:                                                       │
+│  ✓ Browse products freely                                                  │
+│  ✓ View product details                                                    │
+│  ✓ Submit enquiries without login                                          │
+│  ✓ Contact company                                                         │
+│  ✓ Read blog articles                                                      │
+│                                                                             │
+│  ❌ NO LOGIN REQUIRED FOR CUSTOMERS                                        │
+│  ❌ NO ACCOUNT CREATION                                                    │
+│  ❌ NO PASSWORDS                                                           │
+│                                                                             │
+└────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      │ Click "Staff Login"
+                                      ▼
+┌────────────────────────────────────────────────────────────────────────────┐
+│                          🔐 STAFF LOGIN PAGE                                │
+│                      (Public Access, Private Purpose)                       │
+├────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  🔐 YAMINI INFOTECH                                                         │
+│     Internal Staff Access Portal                                            │
+│                                                                             │
+│  ⚠️  This login is for internal staff only.                                │
+│      Customers do not need to log in.                                       │
+│                                                                             │
+│  ┌─────────────────────────────────────────┐                              │
+│  │ Username: [_______________]              │                              │
+│  │ Password: [_______________]              │                              │
+│  │ [         Sign In         ]              │                              │
+│  └─────────────────────────────────────────┘                              │
+│                                                                             │
+└────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      │ Login Successful
+                                      ▼
+                         ┌────────────────────────┐
+                         │   ROLE DETECTION       │
+                         │   getDashboardRoute()  │
+                         └────────────────────────┘
+                                      │
+                    ┌─────────────────┼─────────────────┐
+                    │                 │                 │
+                    ▼                 ▼                 ▼
+            ┌───────────┐     ┌───────────┐    ┌──────────┐
+            │   ADMIN   │     │ RECEPTION │    │ SALESMAN │
+            └───────────┘     └───────────┘    └──────────┘
+                    │                 │                 │
+                    ▼                 ▼                 ▼
+       /admin/dashboard  /reception/dashboard  /salesman/dashboard
+
+                    │                 │                 │
+                    ▼                 ▼                 ▼
+            ┌───────────┐     ┌──────────────┐
+            │ ENGINEER  │     │ OFFICE STAFF │
+            └───────────┘     └──────────────┘
+                    │                 │
+                    ▼                 ▼
+       /engineer/dashboard    /office/dashboard
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│                      🔒 INTERNAL STAFF PORTAL                               │
+│                    (Authentication Required)                                │
+├────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────┐              │
+│  │  HEADER: ☰ LOGO              🔔 (3) 👤 John Doe (Admin)  │              │
+│  └─────────────────────────────────────────────────────────┘              │
+│                                                                             │
+│  UI CHANGES AFTER LOGIN:                                                    │
+│  ✓ Public navigation HIDDEN                                                │
+│  ✓ Sidebar menu SHOWN (role-specific)                                      │
+│  ✓ Notifications ENABLED                                                   │
+│  ✓ User menu SHOWN                                                         │
+│  ✓ Search/Cart HIDDEN                                                      │
+│                                                                             │
+│  PROTECTED ROUTES BY ROLE:                                                  │
+│                                                                             │
+│  👑 ADMIN (Full Access):                                                    │
+│     ├─ /admin/dashboard           → Admin overview                         │
+│     ├─ /reception/dashboard       → View reception work                    │
+│     ├─ /salesman/dashboard        → View sales activity                    │
+│     ├─ /engineer/dashboard        → View service tickets                   │
+│     ├─ /office/dashboard          → View office operations                 │
+│     ├─ /products/add              → Add products                           │
+│     └─ [Access to ALL modules]    → MIF, Reports, Users                    │
+│                                                                             │
+│  👔 OFFICE STAFF:                                                           │
+│     ├─ /office/dashboard          → Office operations                      │
+│     ├─ /products/add              → Manage products                        │
+│     ├─ /products/edit/:id         → Edit products                          │
+│     └─ MIF Access (logged)        → Limited machine records                │
+│                                                                             │
+│  📞 RECEPTION:                                                              │
+│     ├─ /reception/dashboard       → Enquiry management                     │
+│     ├─ Enquiries                  → Create, view, assign                   │
+│     └─ Customers                  → View customer data                     │
+│                                                                             │
+│  💼 SALESMAN:                                                               │
+│     ├─ /salesman/dashboard        → Sales dashboard                        │
+│     ├─ Sales Calls                → Log calls                              │
+│     ├─ Shop Visits                → Record visits                          │
+│     └─ Daily Reports              → Submit daily activity                  │
+│                                                                             │
+│  🔧 SERVICE ENGINEER:                                                       │
+│     ├─ /engineer/dashboard        → Service tickets                        │
+│     ├─ Complaints                 → View assigned tickets                  │
+│     ├─ SLA Tracking               → Monitor deadlines                      │
+│     └─ Status Updates             → Update ticket status                   │
+│                                                                             │
+└────────────────────────────────────────────────────────────────────────────┘
+
+╔════════════════════════════════════════════════════════════════════════════╗
+║                          SECURITY & ACCESS CONTROL                          ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+  FRONTEND PROTECTION:                    BACKEND VALIDATION:
+  ┌──────────────────┐                   ┌──────────────────┐
+  │ ProtectedRoute   │ ────────────────> │ RBAC Middleware  │
+  │ Component        │                   │ (auth.py)        │
+  └──────────────────┘                   └──────────────────┘
+          │                                        │
+          │ Checks:                                │ Validates:
+          │ - isAuthenticated                      │ - JWT Token
+          │ - allowedRoles                         │ - User Role
+          │ - Redirects if fails                   │ - Permissions
+          │                                        │ - Returns 403 if fails
+          ▼                                        ▼
+  ┌──────────────────┐                   ┌──────────────────┐
+  │ AuthContext      │                   │ Database Check   │
+  │ - user           │ <───────────────  │ - User exists?   │
+  │ - isAuthenticated│                   │ - Role valid?    │
+  │ - permissions    │                   │ - Active?        │
+  └──────────────────┘                   └──────────────────┘
+
+  AUDIT LOGGING:
+  ┌────────────────────────────────────────────────────────┐
+  │ All staff actions logged to audit_logs table:          │
+  │ - Who did what                                          │
+  │ - When (timestamp)                                      │
+  │ - What changed (before/after)                           │
+  │ - IP address                                            │
+  │ - Module accessed                                       │
+  └────────────────────────────────────────────────────────┘
+
+╔════════════════════════════════════════════════════════════════════════════╗
+║                        CUSTOMER IDENTITY STRATEGY                           ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+  CUSTOMER SUBMITS ENQUIRY → AUTO-CREATE CUSTOMER RECORD
+  
+  ┌─────────────────────┐
+  │ Enquiry Form        │
+  │ - Name              │
+  │ - Phone ⭐          │ ← Primary Identifier
+  │ - Email ⭐          │ ← Secondary Identifier
+  │ - Product Interest  │
+  │ - Message           │
+  └─────────────────────┘
+            │
+            ▼
+  ┌─────────────────────┐
+  │ Backend Processing  │
+  │ 1. Check if phone   │
+  │    exists in DB     │
+  │ 2. If yes: Link to  │
+  │    existing customer│
+  │ 3. If no: Create    │
+  │    new customer     │
+  └─────────────────────┘
+            │
+            ▼
+  ┌─────────────────────┐
+  │ Customer Record     │
+  │ - customer_id       │
+  │ - name              │
+  │ - phone (unique)    │
+  │ - email             │
+  │ - enquiries []      │
+  │ - status            │
+  └─────────────────────┘
+
+  NO CUSTOMER LOGIN NEEDED!
+  ✓ Zero friction
+  ✓ Better conversion
+  ✓ Simpler UX
+
+╔════════════════════════════════════════════════════════════════════════════╗
+║                          TECHNOLOGY STACK                                   ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+  FRONTEND:                        BACKEND:
+  ┌─────────────────┐             ┌─────────────────┐
+  │ React 18        │             │ FastAPI         │
+  │ React Router v6 │             │ Python 3.x      │
+  │ Axios           │ <────HTTP───>│ SQLAlchemy     │
+  │ Context API     │   (REST)    │ PostgreSQL      │
+  │ CSS3            │             │ JWT Auth        │
+  └─────────────────┘             └─────────────────┘
+
+  ROUTING HELPER:                  AUTHENTICATION:
+  ┌─────────────────┐             ┌─────────────────┐
+  │ dashboardRoutes │             │ JWT Tokens      │
+  │ - getDashboard  │             │ Password Hash   │
+  │ - isPublicRoute │             │ Role-Based      │
+  │ - isStaffRoute  │             │ Access Control  │
+  └─────────────────┘             └─────────────────┘
+
+╔════════════════════════════════════════════════════════════════════════════╗
+║                             DEPLOYMENT NOTES                                ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+  1. SINGLE DOMAIN MODEL:
+     https://yaminiinfotech.com
+     ├─ /                  → Public website
+     ├─ /products          → Product catalog
+     ├─ /login             → Staff login
+     └─ /admin/dashboard   → Admin panel (after auth)
+
+  2. NO SUBDOMAIN NEEDED:
+     ❌ Don't need: admin.yaminiinfotech.com
+     ❌ Don't need: staff.yaminiinfotech.com
+     ✅ Everything on: yaminiinfotech.com
+
+  3. PRODUCTION CHECKLIST:
+     ☐ Environment variables set
+     ☐ CORS configured correctly
+     ☐ HTTPS enabled
+     ☐ Database backed up
+     ☐ JWT secret strong & secure
+     ☐ Rate limiting enabled
+     ☐ Audit logging active
+
+╔════════════════════════════════════════════════════════════════════════════╗
+║                            SUCCESS METRICS                                  ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+  ✅ Customer Conversion:
+     - No login friction
+     - Higher enquiry rates
+     - Better lead quality
+
+  ✅ Staff Efficiency:
+     - Single dashboard per role
+     - Clear navigation
+     - No confusion
+
+  ✅ Security:
+     - Zero customer data leakage
+     - MIF data protected
+     - All actions audited
+
+  ✅ Maintainability:
+     - Centralized routing
+     - Clear separation
+     - Well documented
+
+═══════════════════════════════════════════════════════════════════════════════
+                         IMPLEMENTATION COMPLETE ✅
+                           December 21, 2025
+═══════════════════════════════════════════════════════════════════════════════
