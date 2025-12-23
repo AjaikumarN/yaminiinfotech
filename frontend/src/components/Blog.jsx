@@ -6,31 +6,6 @@ export default function Blog() {
 
   return (
     <div className="App">
-      {/* Navigation */}
-      <nav className="navbar">
-        <div className="container">
-          <div className="nav-content">
-            <div className="logo">
-              <h2>YAMINI INFOTECH</h2>
-              <p className="tagline">Office Automation & Security Solutions</p>
-            </div>
-            <button 
-              className="mobile-menu-toggle"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            >
-              ☰
-            </button>
-            <ul className={`nav-links ${mobileMenuOpen ? 'active' : ''}`}>
-              <li><a href="#home">Home</a></li>
-              <li><a href="#about">About</a></li>
-              <li><a href="#products">Products</a></li>
-              <li><a href="#blog">Blog</a></li>
-              <li><a href="#contact">Contact</a></li>
-            </ul>
-          </div>
-        </div>
-      </nav>
-
       {/* Hero Section */}
       <section className="hero" id="home">
         <div className="container">
@@ -363,40 +338,6 @@ export default function Blog() {
           </div>
         </div>
       </section>
-
-      {/* Footer */}
-      <footer className="footer">
-        <div className="container">
-          <div className="footer-content">
-            <div className="footer-section">
-              <h3>YAMINI INFOTECH</h3>
-              <p>Your trusted partner for office automation and security solutions.</p>
-            </div>
-            <div className="footer-section">
-              <h4>Quick Links</h4>
-              <ul>
-                <li><a href="#home">Home</a></li>
-                <li><a href="#about">Company Profile</a></li>
-                <li><a href="#products">Products</a></li>
-                <li><a href="#blog">Blog & Resources</a></li>
-                <li><a href="#contact">Contact Us</a></li>
-              </ul>
-            </div>
-            <div className="footer-section">
-              <h4>Our Locations</h4>
-              <p>Tirunelveli | Nagercoil | Tenkasi | Tuticorin</p>
-            </div>
-          </div>
-          <div className="footer-bottom">
-            <p>&copy; 2025 Yamini Infotech. All rights reserved.</p>
-          </div>
-        </div>
-      </footer>
-
-      {/* Sticky Call Button (Mobile) */}
-      <a href="tel:9042504173" className="sticky-call-btn">
-        📞 Call Now
-      </a>
     </div>
   );
 }
