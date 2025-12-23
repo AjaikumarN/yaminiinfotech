@@ -159,6 +159,30 @@ def get_my_followups(
     
     return crud.get_followups_by_salesman(db=db, salesman_id=current_user.id, status=status)
 
+@router.get("/{enquiry_id}/followups", response_model=List[schemas.FollowUp])
+def get_enquiry_followups(
+    enquiry_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    """Get all follow-ups for a specific enquiry"""
+    # Verify enquiry exists
+    enquiry = db.query(models.Enquiry).filter(models.Enquiry.id == enquiry_id).first()
+    if not enquiry:
+        raise HTTPException(status_code=404, detail="Enquiry not found")
+    
+    # Role-based access control
+    if current_user.role == models.UserRole.SALESMAN:
+        if enquiry.assigned_to != current_user.id:
+            raise HTTPException(status_code=403, detail="You can only view follow-ups for your assigned enquiries")
+    
+    # Get followups for this enquiry
+    followups = db.query(models.SalesFollowUp).filter(
+        models.SalesFollowUp.enquiry_id == enquiry_id
+    ).order_by(models.SalesFollowUp.created_at.desc()).all()
+    
+    return followups
+
 @router.put("/followups/{followup_id}", response_model=schemas.FollowUp)
 def update_followup(
     followup_id: int,

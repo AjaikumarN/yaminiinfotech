@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { apiRequest } from '../utils/api'
-import Header from './Header'
-import Footer from './Footer'
 import './EnquiryDetail.css'
 
 export default function EnquiryDetail() {
@@ -51,7 +49,7 @@ export default function EnquiryDetail() {
 
       // Fetch followups for this enquiry
       try {
-        const followupsData = await apiRequest(`/api/enquiries/followups?enquiry_id=${enquiryId}`)
+        const followupsData = await apiRequest(`/api/enquiries/${enquiryId}/followups`)
         setFollowups(followupsData || [])
       } catch (err) {
         console.error('Error fetching followups:', err)
@@ -99,58 +97,44 @@ export default function EnquiryDetail() {
 
   if (loading) {
     return (
-      <div className="page-wrapper">
-        <Header />
-        <div className="enquiry-detail-container">
-          <div className="loading-spinner">
-            <div className="spinner"></div>
-            <p>Loading enquiry details...</p>
-          </div>
+      <div className="enquiry-detail-container">
+        <div className="loading-spinner">
+          <div className="spinner"></div>
+          <p>Loading enquiry details...</p>
         </div>
-        <Footer />
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="page-wrapper">
-        <Header />
-        <div className="enquiry-detail-container">
-          <div className="error-message">
-            <h2>⚠️ Error</h2>
-            <p>{error}</p>
-            <button onClick={() => navigate(-1)} className="btn-back">
-              Go Back
-            </button>
-          </div>
+      <div className="enquiry-detail-container">
+        <div className="error-message">
+          <h2>⚠️ Error</h2>
+          <p>{error}</p>
+          <button onClick={() => navigate(-1)} className="btn-back">
+            Go Back
+          </button>
         </div>
-        <Footer />
       </div>
     )
   }
 
   if (!enquiry) {
     return (
-      <div className="page-wrapper">
-        <Header />
-        <div className="enquiry-detail-container">
-          <div className="error-message">
-            <h2>Enquiry Not Found</h2>
-            <button onClick={() => navigate(-1)} className="btn-back">
-              Go Back
-            </button>
-          </div>
+      <div className="enquiry-detail-container">
+        <div className="error-message">
+          <h2>Enquiry Not Found</h2>
+          <button onClick={() => navigate(-1)} className="btn-back">
+            Go Back
+          </button>
         </div>
-        <Footer />
       </div>
     )
   }
 
   return (
-    <div className="page-wrapper">
-      <Header />
-      <div className="enquiry-detail-container">
+    <div className="enquiry-detail-container">
         <div className="detail-header">
           <button onClick={() => navigate(-1)} className="btn-back">
             ← Back
@@ -354,7 +338,5 @@ export default function EnquiryDetail() {
           )}
         </div>
       </div>
-      <Footer />
-    </div>
   )
 }
