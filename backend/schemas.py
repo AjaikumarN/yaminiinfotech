@@ -1,7 +1,7 @@
 from pydantic import BaseModel, EmailStr
 from typing import Optional, List
 from datetime import datetime
-from models import UserRole
+from models import UserRole  # OFFICE_STAFF removed - merged into RECEPTION
 
 # User Schemas
 class UserBase(BaseModel):
@@ -74,7 +74,9 @@ class EnquiryBase(BaseModel):
     notes: Optional[str] = None
 
 class EnquiryCreate(EnquiryBase):
-    pass
+    product_id: Optional[int] = None  # Link to product table
+    source: Optional[str] = "website"
+    description: Optional[str] = None
 
 class EnquiryUpdate(BaseModel):
     priority: Optional[str] = None
@@ -88,9 +90,12 @@ class Enquiry(EnquiryBase):
     enquiry_id: str
     status: str
     assigned_to: Optional[int]
+    product_id: Optional[int] = None
+    source: Optional[str] = None
     next_follow_up: Optional[datetime]
     last_follow_up: Optional[datetime]
     created_at: datetime
+    created_by: Optional[str] = None
     
     class Config:
         from_attributes = True
@@ -157,6 +162,19 @@ class MIFRecordBase(BaseModel):
 class MIFRecordCreate(MIFRecordBase):
     customer_id: Optional[int] = None
 
+class MIFRecordUpdate(BaseModel):
+    customer_name: Optional[str] = None
+    machine_model: Optional[str] = None
+    serial_number: Optional[str] = None
+    installation_date: Optional[datetime] = None
+    location: Optional[str] = None
+    machine_value: Optional[float] = None
+    amc_status: Optional[str] = None
+    amc_expiry: Optional[datetime] = None
+    last_service: Optional[datetime] = None
+    next_service: Optional[datetime] = None
+    status: Optional[str] = None
+
 class MIFRecord(MIFRecordBase):
     id: int
     mif_id: str
@@ -204,14 +222,17 @@ class AttendanceCreate(BaseModel):
     photo_path: Optional[str] = None
     status: str = "Present"
 
-# Follow-up Schemas
+# Follow-up Schemas (Single source - merged from FollowUpHistory + EnquiryNote)
 class FollowUpCreate(BaseModel):
     enquiry_id: int
     note: str
+    note_type: str = "follow_up"  # call, meeting, follow_up, visit, general
     followup_date: datetime
     status: str = "Pending"
 
 class FollowUpUpdate(BaseModel):
+    note: Optional[str] = None
+    note_type: Optional[str] = None
     status: Optional[str] = None
     completed_at: Optional[datetime] = None
 
@@ -220,9 +241,11 @@ class FollowUp(BaseModel):
     enquiry_id: int
     salesman_id: int
     note: str
+    note_type: str
     followup_date: datetime
     status: str
     created_at: datetime
+    created_by: Optional[int] = None
     
     class Config:
         from_attributes = True
@@ -288,7 +311,7 @@ class Notification(BaseModel):
     priority: str
     module: str
     action_url: Optional[str]
-    read: bool
+    read_status: bool
     created_at: datetime
     
     class Config:
@@ -340,44 +363,7 @@ class Order(BaseModel):
     class Config:
         from_attributes = True
 
-# Sales Daily Report Schemas
-class SalesDailyReportCreate(BaseModel):
-    date: datetime
-    calls_made: int = 0
-    visits_made: int = 0
-    enquiries_generated: int = 0
-    followups_completed: int = 0
-    orders_created: int = 0
-    revenue_generated: float = 0
-    remarks: Optional[str] = None
-
-class SalesDailyReportUpdate(BaseModel):
-    calls_made: Optional[int] = None
-    visits_made: Optional[int] = None
-    enquiries_generated: Optional[int] = None
-    followups_completed: Optional[int] = None
-    orders_created: Optional[int] = None
-    revenue_generated: Optional[float] = None
-    remarks: Optional[str] = None
-
-class SalesDailyReportResponse(BaseModel):
-    id: int
-    salesman_id: int
-    date: datetime
-    calls_made: int
-    visits_made: int
-    enquiries_generated: int
-    followups_completed: int
-    orders_created: int
-    revenue_generated: float
-    remarks: Optional[str]
-    submitted: bool
-    submitted_at: Optional[datetime]
-    attendance_marked: bool
-    created_at: datetime
-    
-    class Config:
-        from_attributes = True
+# DailyReport schemas already defined above - SalesDailyReport removed (duplicate)
 
 # Salesman Analytics Schemas
 class SalesmanAnalytics(BaseModel):

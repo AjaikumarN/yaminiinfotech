@@ -5,12 +5,11 @@ from datetime import datetime, date
 import enum
 
 class UserRole(str, enum.Enum):
-    ADMIN = "admin"
-    RECEPTION = "reception"
-    SALESMAN = "salesman"
-    SERVICE_ENGINEER = "service_engineer"
-    OFFICE_STAFF = "office_staff"
-    CUSTOMER = "customer"
+    ADMIN = "ADMIN"
+    RECEPTION = "RECEPTION"  # Merged: Office + Reception duties
+    SALESMAN = "SALESMAN"
+    SERVICE_ENGINEER = "SERVICE_ENGINEER"
+    CUSTOMER = "CUSTOMER"
 
 class User(Base):
     __tablename__ = "users"
@@ -84,20 +83,8 @@ class Enquiry(Base):
     customer = relationship("Customer", back_populates="enquiries")
     product = relationship("Product")
     assigned_user = relationship("User", back_populates="enquiries", foreign_keys=[assigned_to])
-    follow_up_history = relationship("FollowUpHistory", back_populates="enquiry")
-    enquiry_notes = relationship("EnquiryNote", back_populates="enquiry")
 
-class FollowUpHistory(Base):
-    __tablename__ = "follow_up_history"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    enquiry_id = Column(Integer, ForeignKey("enquiries.id"))
-    date = Column(DateTime, default=datetime.utcnow)
-    status = Column(String)
-    notes = Column(Text)
-    updated_by = Column(String)
-    
-    enquiry = relationship("Enquiry", back_populates="follow_up_history")
+# FollowUpHistory removed - using SalesFollowUp as single source of truth
 
 class SalesFollowUp(Base):
     __tablename__ = "sales_followups"
@@ -106,23 +93,14 @@ class SalesFollowUp(Base):
     enquiry_id = Column(Integer, ForeignKey("enquiries.id"))
     salesman_id = Column(Integer, ForeignKey("users.id"))
     note = Column(Text, nullable=False)
+    note_type = Column(String, default="follow_up")  # call, meeting, follow_up, visit, general
     followup_date = Column(DateTime, nullable=False)
     status = Column(String, default="Pending")  # Pending, Completed
     completed_at = Column(DateTime)
     created_at = Column(DateTime, default=datetime.utcnow)
+    created_by = Column(Integer, ForeignKey("users.id"))  # Track who created
 
-class EnquiryNote(Base):
-    __tablename__ = "enquiry_notes"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    enquiry_id = Column(Integer, ForeignKey("enquiries.id"))
-    note = Column(Text, nullable=False)
-    note_type = Column(String, default="general")  # general, call, meeting, follow_up
-    created_by = Column(Integer, ForeignKey("users.id"))
-    created_at = Column(DateTime, default=datetime.utcnow)
-    
-    enquiry = relationship("Enquiry", back_populates="enquiry_notes")
-    user = relationship("User")
+# EnquiryNote removed - merged into SalesFollowUp with note_type field
 
 class Complaint(Base):
     __tablename__ = "complaints"
@@ -313,22 +291,7 @@ class Notification(Base):
 
 # NEW MODELS FOR ENHANCED ERP FEATURES
 
-class DailyReport(Base):
-    __tablename__ = "daily_reports"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    salesman_id = Column(Integer, ForeignKey("users.id"))
-    report_date = Column(Date, nullable=False)
-    calls_made = Column(Integer, default=0)
-    shops_visited = Column(Integer, default=0)
-    enquiries_generated = Column(Integer, default=0)
-    sales_closed = Column(Integer, default=0)
-    report_notes = Column(Text)
-    report_submitted = Column(Boolean, default=False)
-    submission_time = Column(DateTime)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    
-    salesman = relationship("User", foreign_keys=[salesman_id])
+# DailyReport removed - using SalesDailyReport as single source of truth
 
 class AuditLog(Base):
     __tablename__ = "audit_logs"
@@ -410,22 +373,60 @@ class Order(Base):
     product = relationship("Product")
     approver = relationship("User", foreign_keys=[approved_by])
 
-class SalesDailyReport(Base):
-    __tablename__ = "sales_daily_reports"
+class DailyReport(Base):
+    """Salesman Daily Report - Single source of truth for daily activities"""
+    __tablename__ = "daily_reports"
     
     id = Column(Integer, primary_key=True, index=True)
-    salesman_id = Column(Integer, ForeignKey("users.id"))
-    date = Column(Date, nullable=False, default=date.today)
+    salesman_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    report_date = Column(Date, nullable=False, default=date.today)
+    
+    # Activity metrics
     calls_made = Column(Integer, default=0)
-    visits_made = Column(Integer, default=0)
+    shops_visited = Column(Integer, default=0)
     enquiries_generated = Column(Integer, default=0)
-    followups_completed = Column(Integer, default=0)
-    orders_created = Column(Integer, default=0)
-    revenue_generated = Column(Float, default=0)
-    remarks = Column(Text)
-    submitted = Column(Boolean, default=False)
-    submitted_at = Column(DateTime)
-    attendance_marked = Column(Boolean, default=False)
+    sales_closed = Column(Integer, default=0)
+    
+    # Report metadata
+    report_notes = Column(Text)
+    report_submitted = Column(Boolean, default=False)
+    submission_time = Column(DateTime)
     created_at = Column(DateTime, default=datetime.utcnow)
     
+    # Relationship
     salesman = relationship("User", foreign_keys=[salesman_id])
+
+class Visitor(Base):
+    """Visitor Log - Reception desk visitor tracking"""
+    __tablename__ = "visitors"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    phone = Column(String, nullable=False)
+    purpose = Column(String, nullable=False)
+    whom_to_meet = Column(String, nullable=False)
+    in_time = Column(String, nullable=False)
+    out_time = Column(String)
+    date = Column(Date, default=date.today)
+    logged_by = Column(Integer, ForeignKey("users.id"))
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    logged_by_user = relationship("User", foreign_keys=[logged_by])
+
+class StockMovement(Base):
+    """Stock Movement - Delivery IN/OUT tracking"""
+    __tablename__ = "stock_movements"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    movement_type = Column(String, nullable=False)  # IN, OUT
+    item_name = Column(String, nullable=False)
+    quantity = Column(Integer, nullable=False)
+    reference = Column(String)  # Service ticket, Order, etc.
+    status = Column(String, default="Pending")  # Pending, Approved, Rejected
+    date = Column(Date, default=date.today)
+    logged_by = Column(Integer, ForeignKey("users.id"))
+    approved_by = Column(Integer, ForeignKey("users.id"))
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    logged_by_user = relationship("User", foreign_keys=[logged_by])
+    approved_by_user = relationship("User", foreign_keys=[approved_by])

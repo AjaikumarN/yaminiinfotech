@@ -22,6 +22,7 @@ pwd_context = CryptContext(
     bcrypt__ident="2b"
 )
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
+oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="api/auth/login", auto_error=False)
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     # Bcrypt has a 72-byte limit
@@ -78,8 +79,27 @@ async def get_current_user(
     
     return user
 
+async def get_current_user_optional(
+    token: str = Depends(oauth2_scheme_optional),
+    db: Session = Depends(get_db)
+) -> Optional[models.User]:
+    """Get current user if authenticated, None otherwise (for public endpoints)"""
+    if not token:
+        return None
+        
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            return None
+    except JWTError:
+        return None
+    
+    user = db.query(models.User).filter(models.User.username == username).first()
+    return user
+
 def check_permission(user: models.User, permission: str) -> bool:
-    """Check if user has specific permission"""
+    """Check if user has specific permission - DEPRECATED, use check_resource_permission"""
     
     permissions = {
         models.UserRole.ADMIN: {
@@ -91,26 +111,22 @@ def check_permission(user: models.User, permission: str) -> bool:
             "manage_products": True,
             "manage_services": True,
             "view_financials": True,
-        },
-        models.UserRole.OFFICE_STAFF: {
-            "access_mif": True,  # Limited, logged
-            "view_all_customers": True,
-            "manage_employees": False,
-            "manage_reception": False,
-            "view_reports": True,
-            "manage_products": True,
-            "manage_services": True,
-            "view_financials": False,
+            "create_invoice": True,
+            "approve_orders": True,
+            "update_stock": True,
         },
         models.UserRole.RECEPTION: {
-            "access_mif": False,
+            "access_mif": "READ_ONLY",  # VIEW ONLY per matrix
             "view_all_customers": True,
             "manage_employees": False,
             "manage_reception": True,
-            "view_reports": False,
+            "view_reports": True,  # Collection/monitoring only
             "manage_products": False,
             "manage_services": False,
-            "view_financials": False,
+            "view_financials": "READ_ONLY",  # Summary only
+            "create_invoice": False,  # CANNOT create invoices
+            "approve_orders": False,  # CANNOT approve orders
+            "update_stock": False,  # CANNOT change stock
         },
         models.UserRole.SALESMAN: {
             "access_mif": False,
@@ -121,6 +137,9 @@ def check_permission(user: models.User, permission: str) -> bool:
             "manage_products": False,
             "manage_services": False,
             "view_financials": False,
+            "create_invoice": False,
+            "approve_orders": False,
+            "update_stock": False,
         },
         models.UserRole.SERVICE_ENGINEER: {
             "access_mif": False,
@@ -131,6 +150,9 @@ def check_permission(user: models.User, permission: str) -> bool:
             "manage_products": False,
             "manage_services": False,
             "view_financials": False,
+            "create_invoice": False,
+            "approve_orders": False,
+            "update_stock": False,
         },
         models.UserRole.CUSTOMER: {
             "access_mif": False,
@@ -141,6 +163,9 @@ def check_permission(user: models.User, permission: str) -> bool:
             "manage_products": False,
             "manage_services": False,
             "view_financials": False,
+            "create_invoice": False,
+            "approve_orders": False,
+            "update_stock": False,
         },
     }
     
@@ -159,10 +184,215 @@ def require_permission(permission: str):
     return permission_checker
 
 def require_mif_access(current_user: models.User = Depends(get_current_user)):
-    """Require MIF access permission"""
-    if not check_permission(current_user, "access_mif"):
+    """Require MIF access permission (Admin full, Reception read-only)"""
+    if current_user.role == models.UserRole.ADMIN:
+        return current_user  # Full access
+    elif current_user.role == models.UserRole.RECEPTION:
+        return current_user  # Read-only access (enforced at route level)
+    else:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="MIF access denied. Only Admin and Office Staff can access MIF data."
+            detail="MIF access denied. Only Admin and Reception can access MIF data."
+        )
+
+# ============================================================================
+# PHASE 3: ENHANCED RBAC - RESOURCE-ACTION PERMISSION MATRIX
+# ============================================================================
+
+def check_resource_permission(user: models.User, resource: str, action: str) -> bool:
+    """
+    Granular permission checker based on resource-action matrix
+    
+    Resources: order, product, enquiry, mif, stock, invoice, report
+    Actions: read, write, approve, delete
+    
+    Returns True if user has permission, False otherwise
+    """
+    
+    # Permission matrix aligned with MASTER ROLE MATRIX
+    PERMISSION_MATRIX = {
+        models.UserRole.ADMIN: {
+            'order': ['read', 'write', 'approve', 'delete'],
+            'product': ['read', 'write', 'delete'],
+            'enquiry': ['read', 'write', 'assign', 'delete'],
+            'mif': ['read', 'write', 'delete'],
+            'stock': ['read', 'write'],
+            'invoice': ['read', 'write'],
+            'report': ['read', 'write'],
+            'notification': ['read', 'write', 'send'],
+            'user': ['read', 'write', 'delete'],
+        },
+        models.UserRole.RECEPTION: {
+            'order': ['read'],  # View only, NO approve
+            'product': ['read'],  # View only, NO edit
+            'enquiry': ['read', 'write', 'assign'],  # Can create & assign
+            'mif': ['read'],  # VIEW ONLY per matrix
+            'stock': ['read'],  # View only, NO updates
+            'invoice': ['read'],  # View only, NO create
+            'report': ['read'],  # Collection/monitoring only
+            'notification': ['read', 'send'],
+            'user': ['read'],
+        },
+        models.UserRole.SALESMAN: {
+            'order': ['read', 'write'],  # Create only, NO approve
+            'product': ['read'],  # Public view only
+            'enquiry': ['read', 'write'],  # Only assigned enquiries
+            'mif': [],  # NO ACCESS
+            'stock': [],  # NO ACCESS to cost/profit
+            'invoice': [],  # NO ACCESS
+            'report': ['write'],  # Submit daily reports only
+            'notification': ['read'],
+            'user': [],
+        },
+        models.UserRole.SERVICE_ENGINEER: {
+            'order': [],
+            'product': ['read'],
+            'enquiry': [],
+            'mif': [],
+            'stock': [],
+            'invoice': [],
+            'report': ['write'],  # Service reports only
+            'notification': ['read'],
+            'user': [],
+        },
+        models.UserRole.CUSTOMER: {
+            'order': ['read'],  # Own orders only
+            'product': ['read'],  # Public catalog only
+            'enquiry': ['write'],  # Can create enquiries
+            'mif': [],
+            'stock': [],
+            'invoice': ['read'],  # Own invoices only
+            'report': [],
+            'notification': ['read'],
+            'user': [],
+        },
+    }
+    
+    role_permissions = PERMISSION_MATRIX.get(user.role, {})
+    resource_permissions = role_permissions.get(resource, [])
+    return action in resource_permissions
+
+
+def require_resource_permission(resource: str, action: str):
+    """Dependency to enforce resource-action permission"""
+    def permission_checker(current_user: models.User = Depends(get_current_user)):
+        if not check_resource_permission(current_user, resource, action):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Permission denied: {action.upper()} access to {resource} not allowed for {current_user.role.value}"
+            )
+        return current_user
+    return permission_checker
+
+
+# Specific permission checkers for common operations
+def require_order_approval(current_user: models.User = Depends(get_current_user)):
+    """Require order approval permission (Admin only per matrix)"""
+    if not check_resource_permission(current_user, 'order', 'approve'):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Order approval denied. Only Admin can approve orders."
         )
     return current_user
+
+
+def require_stock_write(current_user: models.User = Depends(get_current_user)):
+    """Require stock write permission (Admin only per matrix)"""
+    if not check_resource_permission(current_user, 'stock', 'write'):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Stock update denied. Only Admin can update stock."
+        )
+    return current_user
+
+
+def require_product_write(current_user: models.User = Depends(get_current_user)):
+    """Require product write permission (Admin only per matrix)"""
+    if not check_resource_permission(current_user, 'product', 'write'):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Product modification denied. Only Admin can modify products."
+        )
+    return current_user
+
+
+def require_enquiry_write(current_user: models.User = Depends(get_current_user)):
+    """Require enquiry write permission (Admin + Reception per matrix)"""
+    if not check_resource_permission(current_user, 'enquiry', 'write'):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Enquiry modification denied. Only Admin and Reception can modify enquiries."
+        )
+    return current_user
+
+
+def filter_enquiries_by_role(user: models.User, query):
+    """Filter enquiries based on user role - Salesman sees only assigned"""
+    if user.role == models.UserRole.SALESMAN:
+        # Salesman can only see enquiries assigned to them
+        return query.filter(models.Enquiry.assigned_to == user.id)
+    elif user.role in [models.UserRole.ADMIN, models.UserRole.RECEPTION]:
+        # Admin and Reception see all enquiries
+        return query
+    else:
+        # Other roles see nothing
+        return query.filter(models.Enquiry.id == -1)
+
+
+def require_mif_write(current_user: models.User = Depends(get_current_user)):
+    """Require MIF write access (Admin only)"""
+    if current_user.role != models.UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="MIF write access denied. Only Admin can create or update MIF records."
+        )
+    return current_user
+
+# ============================================================================
+# PHASE 3: GRANULAR PERMISSION FUNCTIONS (Resource-Specific RBAC)
+# ============================================================================
+
+def require_order_approval(current_user: models.User = Depends(get_current_user)):
+    """Require order approval permission (Admin only)"""
+    if current_user.role != models.UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Order approval denied. Only Admin can approve or reject orders."
+        )
+    return current_user
+
+def require_stock_write(current_user: models.User = Depends(get_current_user)):
+    """Require stock update permission (Admin only)"""
+    if current_user.role != models.UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Stock update denied. Only Admin can modify stock quantities."
+        )
+    return current_user
+
+def require_product_write(current_user: models.User = Depends(get_current_user)):
+    """Require product write permission (Admin only)"""
+    if current_user.role != models.UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Product management denied. Only Admin can create or update products."
+        )
+    return current_user
+
+def require_enquiry_write(current_user: models.User = Depends(get_current_user)):
+    """Require enquiry write permission (Admin + Reception)"""
+    if current_user.role not in [models.UserRole.ADMIN, models.UserRole.RECEPTION]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Enquiry management denied. Only Admin and Reception can manage enquiries."
+        )
+    return current_user
+
+def check_enquiry_access(current_user: models.User, enquiry, db: Session):
+    """Check if user can access specific enquiry"""
+    if current_user.role in [models.UserRole.ADMIN, models.UserRole.RECEPTION]:
+        return True  # Full access
+    elif current_user.role == models.UserRole.SALESMAN:
+        return enquiry.assigned_to == current_user.id  # Only assigned enquiries
+    return False
+

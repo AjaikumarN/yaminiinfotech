@@ -16,6 +16,17 @@ def get_current_user_info(
     """Get current logged-in user info"""
     return current_user
 
+@router.get("/salesmen/", response_model=List[schemas.User])
+def get_salesmen(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    """Get all salesmen (accessible to reception for enquiry assignment)"""
+    salesmen = db.query(models.User).filter(
+        models.User.role == 'SALESMAN'
+    ).all()
+    return salesmen
+
 @router.get("/", response_model=List[schemas.User])
 def get_users(
     skip: int = 0,

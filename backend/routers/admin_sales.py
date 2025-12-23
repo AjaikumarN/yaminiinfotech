@@ -19,10 +19,10 @@ def get_salesman_performance(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
-    """Get performance metrics for all salesmen - Admin and Office Staff only"""
+    """Get performance metrics for all salesmen - Admin and Reception only"""
     
-    if current_user.role not in [models.UserRole.ADMIN, models.UserRole.OFFICE_STAFF]:
-        raise HTTPException(status_code=403, detail="Only admin and office staff can view sales performance")
+    if current_user.role not in [models.UserRole.ADMIN, models.UserRole.RECEPTION]:
+        raise HTTPException(status_code=403, detail="Only admin and reception can view sales performance")
     
     # Get all salesmen
     salesmen = db.query(models.User).filter(models.User.role == models.UserRole.SALESMAN).all()
@@ -108,10 +108,10 @@ def get_sales_funnel(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
-    """Get sales funnel data - Admin and Office Staff only"""
+    """Get sales funnel data - Admin and Reception only"""
     
-    if current_user.role not in [models.UserRole.ADMIN, models.UserRole.OFFICE_STAFF]:
-        raise HTTPException(status_code=403, detail="Only admin and office staff can view sales funnel")
+    if current_user.role not in [models.UserRole.ADMIN, models.UserRole.RECEPTION]:
+        raise HTTPException(status_code=403, detail="Only admin and reception can view sales funnel")
     
     query = db.query(models.Enquiry)
     
@@ -227,10 +227,10 @@ def get_all_daily_reports(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
-    """Get all daily reports - Admin and Office Staff only"""
+    """Get revenue report - Admin and Reception only"""
     
-    if current_user.role not in [models.UserRole.ADMIN, models.UserRole.OFFICE_STAFF]:
-        raise HTTPException(status_code=403, detail="Only admin and office staff can view daily reports")
+    if current_user.role not in [models.UserRole.ADMIN, models.UserRole.RECEPTION]:
+        raise HTTPException(status_code=403, detail="Only admin and reception can view revenue reports")
     
     query = db.query(models.SalesDailyReport)
     

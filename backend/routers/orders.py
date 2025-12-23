@@ -7,6 +7,7 @@ import schemas
 import models
 import auth
 from database import get_db
+from notification_service import NotificationService
 
 router = APIRouter(prefix="/api/orders", tags=["Orders"])
 
@@ -91,6 +92,18 @@ def create_order(
     db.commit()
     db.refresh(db_order)
     
+    # PHASE 4: Send notifications
+    try:
+        NotificationService.notify_order_created(
+            db=db,
+            order=db_order,
+            created_by_user=current_user
+        )
+    except Exception as e:
+        # Log error but don't fail the request
+        import logging
+        logging.error(f"Failed to send order notifications: {e}")
+    
     return db_order
 
 @router.get("/", response_model=List[schemas.Order])
@@ -106,8 +119,8 @@ def get_orders(
     # Salesman can only see their own orders
     if current_user.role == models.UserRole.SALESMAN:
         query = query.filter(models.Order.salesman_id == current_user.id)
-    # Admin and Office Staff can see all orders
-    elif current_user.role not in [models.UserRole.ADMIN, models.UserRole.OFFICE_STAFF]:
+    # Admin and Reception can see all orders
+    elif current_user.role not in [models.UserRole.ADMIN, models.UserRole.RECEPTION]:
         raise HTTPException(status_code=403, detail="Permission denied")
     
     if status:
@@ -134,10 +147,10 @@ def get_pending_orders(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
-    """Get pending orders - Admin and Office Staff only"""
+    """Get pending orders - Admin and Reception can view, only Admin can approve"""
     
-    if current_user.role not in [models.UserRole.ADMIN, models.UserRole.OFFICE_STAFF]:
-        raise HTTPException(status_code=403, detail="Only admin and office staff can view pending orders")
+    if current_user.role not in [models.UserRole.ADMIN, models.UserRole.RECEPTION]:
+        raise HTTPException(status_code=403, detail="Only admin and reception can view pending orders")
     
     return db.query(models.Order).filter(
         models.Order.status == "PENDING"
@@ -166,13 +179,9 @@ def approve_order(
     order_id: int,
     approval: schemas.OrderApprove,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user)
+    current_user: models.User = Depends(auth.require_order_approval)  # Admin only
 ):
-    """Approve or reject order - Admin and Office Staff only"""
-    
-    # Only Admin and Office Staff can approve
-    if current_user.role not in [models.UserRole.ADMIN, models.UserRole.OFFICE_STAFF]:
-        raise HTTPException(status_code=403, detail="Only admin and office staff can approve orders")
+    """Approve or reject order - ADMIN ONLY (Backend enforced)"""
     
     order = db.query(models.Order).filter(models.Order.id == order_id).first()
     if not order:
@@ -194,7 +203,7 @@ def approve_order(
                 detail=f"Insufficient stock. Available: {product.stock_quantity}, Required: {order.quantity}"
             )
         
-        # Deduct stock
+        # Atomic transaction: Deduct stock
         product.stock_quantity -= order.quantity
         
         # Generate invoice
@@ -221,6 +230,25 @@ def approve_order(
     db.commit()
     db.refresh(order)
     
+    # PHASE 4: Send notifications
+    try:
+        if approval.approved:
+            NotificationService.notify_order_approved(
+                db=db,
+                order=order,
+                approved_by=current_user
+            )
+        else:
+            NotificationService.notify_order_rejected(
+                db=db,
+                order=order,
+                rejected_by=current_user,
+                reason=approval.rejection_reason or "No reason provided"
+            )
+    except Exception as e:
+        import logging
+        logging.error(f"Failed to send order approval/rejection notifications: {e}")
+    
     return order
 
 @router.put("/{order_id}", response_model=schemas.Order)
@@ -228,13 +256,9 @@ def update_order(
     order_id: int,
     order_update: schemas.OrderUpdate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user)
+    current_user: models.User = Depends(auth.require_order_approval)  # Admin only
 ):
-    """Update order - Admin and Office Staff only (before approval)"""
-    
-    # Only Admin and Office Staff can edit
-    if current_user.role not in [models.UserRole.ADMIN, models.UserRole.OFFICE_STAFF]:
-        raise HTTPException(status_code=403, detail="Only admin and office staff can edit orders")
+    """Update order - ADMIN ONLY (Backend enforced, before approval)"""
     
     order = db.query(models.Order).filter(models.Order.id == order_id).first()
     if not order:
@@ -274,12 +298,9 @@ def update_order(
 def delete_order(
     order_id: int,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user)
+    current_user: models.User = Depends(auth.require_order_approval)  # Admin only
 ):
-    """Delete order - Admin only (only if PENDING)"""
-    
-    if current_user.role != models.UserRole.ADMIN:
-        raise HTTPException(status_code=403, detail="Only admin can delete orders")
+    """Delete order - ADMIN ONLY (Backend enforced, only if PENDING)"""
     
     order = db.query(models.Order).filter(models.Order.id == order_id).first()
     if not order:

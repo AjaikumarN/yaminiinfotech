@@ -1,8 +1,9 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { FiSearch, FiBell, FiShoppingCart, FiMenu, FiX, FiChevronDown, FiChevronUp, FiUser, FiLogOut } from 'react-icons/fi'
 import { useAuth } from '../contexts/AuthContext.jsx'
-import { useNotifications } from '../contexts/NotificationContext.jsx'
+import { apiRequest } from '../utils/api.js'
+import Notifications from './Notifications.jsx'
 
 const navItems = [
   { label: 'Home', href: '/' },
@@ -15,11 +16,47 @@ const navItems = [
 
 export default function Header({ showNotificationPanel, setShowNotificationPanel }) {
   const { isAuthenticated, user, logout } = useAuth()
-  const { unreadCount } = useNotifications()
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
   const [employeesOpen, setEmployeesOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
+  const [notifications, setNotifications] = useState([])
+  const [allNotifications, setAllNotifications] = useState([])
+
+  // Fetch backend notifications for authenticated users
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      fetchNotifications()
+      // Poll every 60 seconds
+      const interval = setInterval(fetchNotifications, 60000)
+      return () => clearInterval(interval)
+    }
+  }, [isAuthenticated, user])
+
+  const fetchNotifications = async () => {
+    try {
+      const allNotifs = await apiRequest('/api/notifications/my-notifications')
+      
+      // Filter unread on frontend since API parameter might not work
+      const unreadNotifs = (allNotifs || []).filter(n => !n.read_status)
+      
+      setNotifications(unreadNotifs)
+      setAllNotifications(allNotifs || [])
+      setUnreadCount(unreadNotifs.length)
+    } catch (error) {
+      console.error('Failed to fetch notifications:', error)
+    }
+  }
+
+  const markAsRead = async (notificationId) => {
+    try {
+      await apiRequest(`/api/notifications/${notificationId}/read`, { method: 'PUT' })
+      await fetchNotifications() // Refresh notifications
+    } catch (error) {
+      console.error('Failed to mark notification as read:', error)
+    }
+  }
 
   const toggleMenu = () => setMenuOpen(!menuOpen)
   const closeMenu = () => {
@@ -34,6 +71,15 @@ export default function Header({ showNotificationPanel, setShowNotificationPanel
   }
 
   return (
+    <>
+    <Notifications 
+      showPanel={showNotificationPanel}
+      setShowPanel={setShowNotificationPanel}
+      backendNotifications={notifications}
+      allNotifications={allNotifications}
+      markAsRead={markAsRead}
+      refreshNotifications={fetchNotifications}
+    />
     <header className="site-header">
       <div className="topbar">
         <button className="menu-toggle" onClick={toggleMenu} aria-label="Menu">
@@ -187,5 +233,6 @@ export default function Header({ showNotificationPanel, setShowNotificationPanel
       </nav>
       )}
     </header>
+    </>
   )
 }

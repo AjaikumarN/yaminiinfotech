@@ -7,17 +7,28 @@ const SalesmanDashboard = () => {
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
   const [stats, setStats] = useState({
-    todaysCalls: [],
+    todayFollowups: [],
     overdueFollowups: [],
     assignedEnquiries: [],
-    thisWeekReport: null
+    recentVisits: [],
+    dailyReport: null,
+    attendance: null,
+    performance: {
+      totalLeads: 0,
+      contacted: 0,
+      converted: 0,
+      conversionRate: 0,
+      revenue: 0
+    }
   });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchDashboardData();
-    const interval = setInterval(fetchDashboardData, 60000); // Refresh every minute
-    return () => clearInterval(interval);
+    if (user) {
+      fetchDashboardData();
+      const interval = setInterval(fetchDashboardData, 60000); // Refresh every minute
+      return () => clearInterval(interval);
+    }
   }, [user]);
 
   const fetchDashboardData = async () => {
@@ -26,55 +37,59 @@ const SalesmanDashboard = () => {
     try {
       const today = new Date().toISOString().split('T')[0];
       
-      const [enquiries, followups] = await Promise.all([
-        apiRequest(`/api/enquiries?assigned_to=${user.id}`),
-        apiRequest(`/api/followups?user_id=${user.id}`)
+      const [enquiries, followups, visits, reports, attendance] = await Promise.all([
+        apiRequest(`/api/enquiries?assigned_to=${user.id}`).catch(() => []),
+        apiRequest(`/api/enquiries/followups`).catch(() => []),
+        apiRequest(`/api/sales/my-visits`).catch(() => []),
+        apiRequest(`/api/reports/my-reports?days=1`).catch(() => []),
+        apiRequest(`/api/sales/my-attendance?date=${today}`).catch(() => [])
       ]);
 
       const enquiriesData = enquiries || [];
       const followupsData = followups || [];
+      const visitsData = visits || [];
+      const reportsData = reports || [];
+      const attendanceData = attendance || [];
 
-      // Today's calls (followups scheduled for today)
-      const todaysCalls = followupsData.filter(f => 
-        f.scheduled_date?.startsWith(today) && f.status === 'Pending'
+      // Today's follow-ups
+      const todayFollowups = followupsData.filter(f => 
+        f.followup_date?.startsWith(today) && f.status === 'Pending'
       );
 
-      // Overdue followups
+      // Overdue follow-ups
       const now = new Date();
       const overdueFollowups = followupsData.filter(f => {
         if (f.status !== 'Pending') return false;
-        const scheduledDate = new Date(f.scheduled_date);
+        const scheduledDate = new Date(f.followup_date);
         return scheduledDate < now;
       });
 
+      // Calculate performance metrics
+      const contacted = enquiriesData.filter(e => e.status !== 'New').length;
+      const converted = enquiriesData.filter(e => e.status === 'Converted').length;
+      const conversionRate = enquiriesData.length > 0 
+        ? ((converted / enquiriesData.length) * 100).toFixed(1)
+        : 0;
+
       setStats({
-        todaysCalls,
+        todayFollowups,
         overdueFollowups,
         assignedEnquiries: enquiriesData,
-        thisWeekReport: null // Will be populated from daily reports API
+        recentVisits: visitsData.slice(0, 5),
+        dailyReport: reportsData[0] || null,
+        attendance: attendanceData[0] || null,
+        performance: {
+          totalLeads: enquiriesData.length,
+          contacted,
+          converted,
+          conversionRate,
+          revenue: 0 // Will be calculated from sales data
+        }
       });
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const completeFollowup = async (followupId, enquiryId) => {
-    try {
-      await apiRequest(`/api/followups/${followupId}`, {
-        method: 'PUT',
-        body: JSON.stringify({
-          status: 'Completed',
-          completed_at: new Date().toISOString()
-        })
-      });
-      
-      // Navigate to enquiry detail for adding notes
-      navigate(`/salesman/enquiry/${enquiryId}`);
-    } catch (error) {
-      console.error('Failed to complete followup:', error);
-      alert('Failed to mark followup as complete');
     }
   };
 
@@ -103,93 +118,107 @@ const SalesmanDashboard = () => {
 
   return (
     <div className="salesman-dashboard">
+      {/* Header */}
       <div className="dashboard-header">
         <div>
-          <h1>👋 Welcome, {user?.name}!</h1>
-          <p>Here's your sales activity for today</p>
+          <h1>🎯 Sales Dashboard</h1>
+          <p>Welcome back, {user?.full_name || user?.username}!</p>
         </div>
-        <button className="btn-refresh" onClick={fetchDashboardData}>
-          🔄 Refresh
-        </button>
+        <div className="header-actions">
+          <button 
+            className={`btn-attendance ${stats.attendance ? 'checked-in' : ''}`}
+            onClick={() => navigate('/salesman/attendance')}
+          >
+            {stats.attendance ? '✅ Checked In' : '⏰ Mark Attendance'}
+          </button>
+          <button className="btn-refresh" onClick={fetchDashboardData}>
+            🔄 Refresh
+          </button>
+        </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="stats-grid">
-        <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#667eea' }}>📞</div>
-          <div className="stat-info">
-            <h3>{stats.todaysCalls.length}</h3>
-            <p>Today's Calls</p>
+      {/* Key Metrics */}
+      <div className="metrics-grid">
+        <div className="metric-card">
+          <div className="metric-icon" style={{ background: '#667eea' }}>📋</div>
+          <div className="metric-info">
+            <h3>{stats.performance.totalLeads}</h3>
+            <p>Total Leads Assigned</p>
           </div>
         </div>
 
-        <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#dc3545' }}>⚠️</div>
-          <div className="stat-info">
+        <div className="metric-card">
+          <div className="metric-icon" style={{ background: '#28a745' }}>📞</div>
+          <div className="metric-info">
+            <h3>{stats.performance.contacted}</h3>
+            <p>Leads Contacted</p>
+          </div>
+        </div>
+
+        <div className="metric-card">
+          <div className="metric-icon" style={{ background: '#ffc107' }}>💰</div>
+          <div className="metric-info">
+            <h3>{stats.performance.converted}</h3>
+            <p>Converted Sales</p>
+          </div>
+        </div>
+
+        <div className="metric-card">
+          <div className="metric-icon" style={{ background: '#17a2b8' }}>📈</div>
+          <div className="metric-info">
+            <h3>{stats.performance.conversionRate}%</h3>
+            <p>Conversion Rate</p>
+          </div>
+        </div>
+
+        <div className="metric-card">
+          <div className="metric-icon" style={{ background: '#dc3545' }}>⚠️</div>
+          <div className="metric-info">
             <h3>{stats.overdueFollowups.length}</h3>
             <p>Overdue Follow-ups</p>
           </div>
         </div>
-
-        <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#28a745' }}>📋</div>
-          <div className="stat-info">
-            <h3>{stats.assignedEnquiries.length}</h3>
-            <p>Assigned Enquiries</p>
-          </div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#ffc107' }}>🎯</div>
-          <div className="stat-info">
-            <h3>
-              {stats.assignedEnquiries.filter(e => e.priority === 'HOT').length}
-            </h3>
-            <p>Hot Leads</p>
-          </div>
-        </div>
       </div>
 
-      <div className="content-grid">
-        {/* Today's Calls */}
+      {/* Today's Tasks */}
+      <div className="tasks-section">
         <div className="panel">
           <div className="panel-header">
-            <h2>📞 Today's Calls</h2>
-            <span className="badge">{stats.todaysCalls.length}</span>
+            <h2>📅 Today's Follow-ups</h2>
+            <span className="badge">{stats.todayFollowups.length} pending</span>
           </div>
           <div className="panel-content">
-            {stats.todaysCalls.length === 0 ? (
+            {stats.todayFollowups.length === 0 ? (
               <div className="empty-state">
                 <div className="empty-icon">✅</div>
-                <p>No calls scheduled for today</p>
+                <p>No follow-ups scheduled for today</p>
               </div>
             ) : (
-              <div className="calls-list">
-                {stats.todaysCalls.map(call => (
-                  <div key={call.id} className="call-item">
-                    <div className="call-info">
-                      <h4>{call.enquiry?.customer_name || 'Unknown Customer'}</h4>
-                      <p className="phone">📱 {call.enquiry?.phone}</p>
-                      <p className="time">
-                        ⏰ {new Date(call.scheduled_date).toLocaleTimeString('en-US', {
-                          hour: '2-digit',
-                          minute: '2-digit'
+              <div className="followup-list">
+                {stats.todayFollowups.map(followup => (
+                  <div key={followup.id} className="followup-card">
+                    <div className="followup-header">
+                      <h4>{followup.customer_name || `Enquiry #${followup.enquiry_id}`}</h4>
+                      <span className="followup-time">
+                        {new Date(followup.followup_date).toLocaleTimeString('en-US', { 
+                          hour: '2-digit', 
+                          minute: '2-digit' 
                         })}
-                      </p>
-                      <p className="notes">{call.notes}</p>
+                      </span>
                     </div>
-                    <div className="call-actions">
-                      <button
-                        className="btn-complete"
-                        onClick={() => completeFollowup(call.id, call.enquiry_id)}
+                    <p className="followup-note">{followup.note}</p>
+                    <div className="followup-actions">
+                      <button 
+                        className="btn-primary"
+                        onClick={() => navigate(`/salesman/enquiries/${followup.enquiry_id}`)}
                       >
-                        ✓ Complete
+                        View Enquiry
                       </button>
-                      <button
-                        className="btn-view"
-                        onClick={() => navigate(`/salesman/enquiry/${call.enquiry_id}`)}
+                      <button 
+                        className="btn-success"
+                        onClick={() => navigate('/salesman/followups')}
                       >
-                        View Details
+                        Mark Complete
                       </button>
                     </div>
                   </div>
@@ -199,112 +228,81 @@ const SalesmanDashboard = () => {
           </div>
         </div>
 
-        {/* Overdue Follow-ups */}
-        <div className="panel">
-          <div className="panel-header">
-            <h2>⚠️ Overdue Follow-ups</h2>
-            <span className="badge alert">{stats.overdueFollowups.length}</span>
-          </div>
-          <div className="panel-content">
-            {stats.overdueFollowups.length === 0 ? (
-              <div className="empty-state">
-                <div className="empty-icon">🎉</div>
-                <p>No overdue follow-ups!</p>
-              </div>
-            ) : (
-              <div className="calls-list">
-                {stats.overdueFollowups.map(followup => (
-                  <div key={followup.id} className="call-item urgent">
-                    <div className="call-info">
-                      <h4>{followup.enquiry?.customer_name || 'Unknown Customer'}</h4>
-                      <p className="phone">📱 {followup.enquiry?.phone}</p>
-                      <p className="overdue-time">
-                        ⏱️ Due {getTimeDifference(followup.scheduled_date)}
-                      </p>
-                      <p className="notes">{followup.notes}</p>
-                    </div>
-                    <div className="call-actions">
-                      <button
-                        className="btn-complete"
-                        onClick={() => completeFollowup(followup.id, followup.enquiry_id)}
-                      >
-                        ✓ Complete
-                      </button>
-                      <button
-                        className="btn-view"
-                        onClick={() => navigate(`/salesman/enquiry/${followup.enquiry_id}`)}
-                      >
-                        View Details
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Assigned Enquiries */}
-      <div className="panel full-width">
-        <div className="panel-header">
-          <h2>📋 My Enquiries</h2>
-          <span className="badge">{stats.assignedEnquiries.length}</span>
-        </div>
-        <div className="panel-content">
-          {stats.assignedEnquiries.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-icon">📦</div>
-              <p>No enquiries assigned yet</p>
+        {/* Overdue Follow-ups Alert */}
+        {stats.overdueFollowups.length > 0 && (
+          <div className="panel alert-panel">
+            <div className="panel-header alert">
+              <h2>⚠️ Overdue Follow-ups</h2>
+              <span className="badge badge-danger">{stats.overdueFollowups.length}</span>
             </div>
-          ) : (
-            <div className="enquiries-grid">
-              {stats.assignedEnquiries.map(enq => (
-                <div
-                  key={enq.id}
-                  className="enquiry-card"
-                  onClick={() => navigate(`/salesman/enquiry/${enq.id}`)}
-                >
-                  <div className="card-header">
-                    <span
-                      className="priority-badge"
-                      style={{ background: getPriorityColor(enq.priority) }}
+            <div className="panel-content">
+              <div className="followup-list">
+                {stats.overdueFollowups.slice(0, 3).map(followup => (
+                  <div key={followup.id} className="followup-card alert">
+                    <div className="followup-header">
+                      <h4>{followup.customer_name || `Enquiry #${followup.enquiry_id}`}</h4>
+                      <span className="overdue-tag">
+                        {getTimeDifference(followup.followup_date)}
+                      </span>
+                    </div>
+                    <p className="followup-note">{followup.note}</p>
+                    <button 
+                      className="btn-primary"
+                      onClick={() => navigate(`/salesman/enquiries/${followup.enquiry_id}`)}
                     >
-                      {enq.priority}
-                    </span>
-                    <span className="time-badge">
-                      {getTimeDifference(enq.created_at)}
-                    </span>
+                      Follow Up Now
+                    </button>
                   </div>
-
-                  <h3>{enq.customer_name}</h3>
-                  <p className="contact-info">
-                    📱 {enq.phone}
-                    {enq.email && <span> | ✉️ {enq.email}</span>}
-                  </p>
-
-                  {enq.product && (
-                    <div className="product-tag">
-                      🖨️ {enq.product.name}
-                    </div>
-                  )}
-
-                  <p className="enquiry-details">
-                    {enq.enquiry_details?.substring(0, 100)}...
-                  </p>
-
-                  <div className="card-footer">
-                    <span className="status-badge">{enq.status || 'New'}</span>
-                    <span className="arrow">→</span>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
+              {stats.overdueFollowups.length > 3 && (
+                <button 
+                  className="btn-link"
+                  onClick={() => navigate('/salesman/followups?filter=overdue')}
+                >
+                  View all {stats.overdueFollowups.length} overdue follow-ups →
+                </button>
+              )}
             </div>
-          )}
+          </div>
+        )}
+      </div>
+
+      {/* Quick Actions */}
+      <div className="quick-actions-panel">
+        <h2>⚡ Quick Actions</h2>
+        <div className="actions-grid">
+          <button className="action-btn" onClick={() => navigate('/salesman/enquiries')}>
+            <span className="action-icon">📋</span>
+            <span className="action-text">My Enquiries</span>
+            <span className="action-count">{stats.assignedEnquiries.length}</span>
+          </button>
+          <button className="action-btn" onClick={() => navigate('/salesman/followups')}>
+            <span className="action-icon">🔄</span>
+            <span className="action-text">Follow-ups</span>
+            <span className="action-count">{stats.todayFollowups.length}</span>
+          </button>
+          <button className="action-btn" onClick={() => navigate('/salesman/visits')}>
+            <span className="action-icon">🏢</span>
+            <span className="action-text">Field Visits</span>
+          </button>
+          <button className="action-btn" onClick={() => navigate('/salesman/daily-report')}>
+            <span className="action-icon">📝</span>
+            <span className="action-text">Daily Report</span>
+            {!stats.dailyReport && <span className="action-badge">Due</span>}
+          </button>
+          <button className="action-btn" onClick={() => navigate('/products')}>
+            <span className="action-icon">📦</span>
+            <span className="action-text">Product Catalog</span>
+          </button>
+          <button className="action-btn" onClick={() => navigate('/salesman/performance')}>
+            <span className="action-icon">📊</span>
+            <span className="action-text">My Performance</span>
+          </button>
         </div>
       </div>
 
-      <style jsx>{`
+      <style>{`
         .salesman-dashboard {
           padding: 20px;
           background: #f5f7fa;
@@ -332,10 +330,14 @@ const SalesmanDashboard = () => {
           color: #666;
         }
 
+        .header-actions {
+          display: flex;
+          gap: 10px;
+        }
+
+        .btn-attendance,
         .btn-refresh {
           padding: 12px 24px;
-          background: #667eea;
-          color: white;
           border: none;
           border-radius: 8px;
           font-weight: 600;
@@ -343,18 +345,33 @@ const SalesmanDashboard = () => {
           transition: all 0.3s;
         }
 
+        .btn-attendance {
+          background: #ffc107;
+          color: #1a1a1a;
+        }
+
+        .btn-attendance.checked-in {
+          background: #28a745;
+          color: white;
+        }
+
+        .btn-refresh {
+          background: #667eea;
+          color: white;
+        }
+
         .btn-refresh:hover {
           background: #5568d3;
         }
 
-        .stats-grid {
+        .metrics-grid {
           display: grid;
-          grid-template-columns: repeat(4, 1fr);
+          grid-template-columns: repeat(5, 1fr);
           gap: 20px;
           margin-bottom: 30px;
         }
 
-        .stat-card {
+        .metric-card {
           background: white;
           padding: 20px;
           border-radius: 12px;
@@ -364,7 +381,7 @@ const SalesmanDashboard = () => {
           box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
 
-        .stat-icon {
+        .metric-icon {
           width: 60px;
           height: 60px;
           border-radius: 12px;
@@ -374,21 +391,21 @@ const SalesmanDashboard = () => {
           font-size: 28px;
         }
 
-        .stat-info h3 {
+        .metric-info h3 {
           margin: 0;
-          font-size: 32px;
+          font-size: 28px;
           color: #1a1a1a;
         }
 
-        .stat-info p {
+        .metric-info p {
           margin: 5px 0 0 0;
           color: #666;
-          font-size: 14px;
+          font-size: 13px;
         }
 
-        .content-grid {
+        .tasks-section {
           display: grid;
-          grid-template-columns: repeat(2, 1fr);
+          grid-template-columns: 1fr 1fr;
           gap: 20px;
           margin-bottom: 30px;
         }
@@ -399,8 +416,8 @@ const SalesmanDashboard = () => {
           box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
 
-        .panel.full-width {
-          grid-column: 1 / -1;
+        .panel.alert-panel {
+          border: 2px solid #dc3545;
         }
 
         .panel-header {
@@ -411,9 +428,14 @@ const SalesmanDashboard = () => {
           border-bottom: 2px solid #f0f0f0;
         }
 
+        .panel-header.alert {
+          background: #fff5f5;
+          border-bottom-color: #dc3545;
+        }
+
         .panel-header h2 {
           margin: 0;
-          font-size: 20px;
+          font-size: 18px;
           color: #1a1a1a;
         }
 
@@ -423,9 +445,10 @@ const SalesmanDashboard = () => {
           border-radius: 12px;
           font-weight: 700;
           color: #666;
+          font-size: 12px;
         }
 
-        .badge.alert {
+        .badge-danger {
           background: #dc3545;
           color: white;
         }
@@ -434,187 +457,109 @@ const SalesmanDashboard = () => {
           padding: 20px;
         }
 
-        .calls-list {
+        .followup-list {
           display: flex;
           flex-direction: column;
           gap: 15px;
         }
 
-        .call-item {
-          background: #f8f9fa;
+        .followup-card {
           padding: 15px;
+          background: #f8f9fa;
           border-radius: 8px;
+          border-left: 4px solid #667eea;
+        }
+
+        .followup-card.alert {
+          background: #fff5f5;
+          border-left-color: #dc3545;
+        }
+
+        .followup-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          transition: all 0.3s;
+          margin-bottom: 8px;
         }
 
-        .call-item.urgent {
-          border-left: 4px solid #dc3545;
-        }
-
-        .call-item:hover {
-          box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-
-        .call-info h4 {
-          margin: 0 0 5px 0;
-          color: #1a1a1a;
-        }
-
-        .call-info p {
-          margin: 3px 0;
-          font-size: 13px;
-          color: #666;
-        }
-
-        .phone {
-          font-weight: 600;
-          color: #667eea;
-        }
-
-        .time {
-          color: #28a745;
-          font-weight: 600;
-        }
-
-        .overdue-time {
-          color: #dc3545;
-          font-weight: 700;
-        }
-
-        .notes {
-          font-style: italic;
-        }
-
-        .call-actions {
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
-
-        .btn-complete,
-        .btn-view {
-          padding: 8px 16px;
-          border: none;
-          border-radius: 6px;
-          font-weight: 600;
-          font-size: 13px;
-          cursor: pointer;
-          transition: all 0.3s;
-          white-space: nowrap;
-        }
-
-        .btn-complete {
-          background: #28a745;
-          color: white;
-        }
-
-        .btn-complete:hover {
-          background: #218838;
-        }
-
-        .btn-view {
-          background: #667eea;
-          color: white;
-        }
-
-        .btn-view:hover {
-          background: #5568d3;
-        }
-
-        .enquiries-grid {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 20px;
-        }
-
-        .enquiry-card {
-          background: #f8f9fa;
-          padding: 15px;
-          border-radius: 8px;
-          cursor: pointer;
-          transition: all 0.3s;
-        }
-
-        .enquiry-card:hover {
-          transform: translateY(-4px);
-          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        }
-
-        .card-header {
-          display: flex;
-          justify-content: space-between;
-          margin-bottom: 12px;
-        }
-
-        .priority-badge {
-          padding: 4px 10px;
-          border-radius: 4px;
-          color: white;
-          font-size: 11px;
-          font-weight: 700;
-        }
-
-        .time-badge {
-          background: #e0e0e0;
-          padding: 4px 8px;
-          border-radius: 4px;
-          font-size: 11px;
-          color: #666;
-        }
-
-        .enquiry-card h3 {
-          margin: 0 0 8px 0;
+        .followup-header h4 {
+          margin: 0;
           font-size: 16px;
           color: #1a1a1a;
         }
 
-        .contact-info {
-          margin: 0 0 10px 0;
+        .followup-time {
           font-size: 12px;
           color: #666;
+          background: white;
+          padding: 4px 8px;
+          border-radius: 4px;
         }
 
-        .product-tag {
-          background: #e8f5e9;
-          color: #2e7d32;
-          padding: 6px 10px;
-          border-radius: 6px;
+        .overdue-tag {
           font-size: 12px;
-          margin-bottom: 10px;
+          color: white;
+          background: #dc3545;
+          padding: 4px 8px;
+          border-radius: 4px;
           font-weight: 600;
         }
 
-        .enquiry-details {
-          font-size: 13px;
+        .followup-note {
+          margin: 8px 0;
           color: #666;
-          line-height: 1.5;
-          margin: 0 0 12px 0;
+          font-size: 14px;
         }
 
-        .card-footer {
+        .followup-actions {
           display: flex;
-          justify-content: space-between;
-          align-items: center;
-          border-top: 1px solid #e0e0e0;
-          padding-top: 10px;
+          gap: 10px;
+          margin-top: 10px;
         }
 
-        .status-badge {
+        .btn-primary,
+        .btn-success {
+          padding: 8px 16px;
+          border: none;
+          border-radius: 6px;
+          font-weight: 600;
+          cursor: pointer;
+          font-size: 13px;
+          transition: all 0.3s;
+        }
+
+        .btn-primary {
           background: #667eea;
           color: white;
-          padding: 4px 10px;
-          border-radius: 4px;
-          font-size: 11px;
-          font-weight: 600;
         }
 
-        .arrow {
+        .btn-primary:hover {
+          background: #5568d3;
+        }
+
+        .btn-success {
+          background: #28a745;
+          color: white;
+        }
+
+        .btn-success:hover {
+          background: #218838;
+        }
+
+        .btn-link {
+          background: none;
+          border: none;
           color: #667eea;
-          font-weight: 700;
-          font-size: 18px;
+          cursor: pointer;
+          font-weight: 600;
+          margin-top: 10px;
+          width: 100%;
+          text-align: center;
+          padding: 10px;
+        }
+
+        .btn-link:hover {
+          text-decoration: underline;
         }
 
         .empty-state {
@@ -633,6 +578,76 @@ const SalesmanDashboard = () => {
           margin: 0;
         }
 
+        .quick-actions-panel {
+          background: white;
+          padding: 25px;
+          border-radius: 12px;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .quick-actions-panel h2 {
+          margin: 0 0 20px 0;
+          color: #1a1a1a;
+        }
+
+        .actions-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 15px;
+        }
+
+        .action-btn {
+          background: #f8f9fa;
+          border: 2px solid #e0e0e0;
+          padding: 20px;
+          border-radius: 8px;
+          cursor: pointer;
+          transition: all 0.3s;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 8px;
+          position: relative;
+        }
+
+        .action-btn:hover {
+          border-color: #667eea;
+          background: white;
+          transform: translateY(-4px);
+          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .action-icon {
+          font-size: 36px;
+        }
+
+        .action-text {
+          font-weight: 600;
+          color: #1a1a1a;
+          font-size: 14px;
+        }
+
+        .action-count {
+          background: #667eea;
+          color: white;
+          padding: 4px 12px;
+          border-radius: 12px;
+          font-size: 12px;
+          font-weight: 700;
+        }
+
+        .action-badge {
+          position: absolute;
+          top: 10px;
+          right: 10px;
+          background: #dc3545;
+          color: white;
+          padding: 4px 8px;
+          border-radius: 4px;
+          font-size: 11px;
+          font-weight: 700;
+        }
+
         .loading {
           text-align: center;
           padding: 100px 20px;
@@ -640,40 +655,44 @@ const SalesmanDashboard = () => {
           color: #666;
         }
 
-        @media (max-width: 1200px) {
-          .stats-grid {
+        @media (max-width: 1400px) {
+          .metrics-grid {
+            grid-template-columns: repeat(3, 1fr);
+          }
+        }
+
+        @media (max-width: 968px) {
+          .metrics-grid {
             grid-template-columns: repeat(2, 1fr);
           }
 
-          .content-grid {
+          .tasks-section {
             grid-template-columns: 1fr;
           }
 
-          .enquiries-grid {
+          .actions-grid {
             grid-template-columns: repeat(2, 1fr);
           }
         }
 
-        @media (max-width: 768px) {
-          .stats-grid {
+        @media (max-width: 576px) {
+          .metrics-grid,
+          .actions-grid {
             grid-template-columns: 1fr;
           }
 
-          .enquiries-grid {
-            grid-template-columns: 1fr;
-          }
-
-          .call-item {
+          .dashboard-header {
             flex-direction: column;
             gap: 15px;
           }
 
-          .call-actions {
+          .header-actions {
             width: 100%;
+            flex-direction: column;
           }
 
-          .btn-complete,
-          .btn-view {
+          .btn-attendance,
+          .btn-refresh {
             width: 100%;
           }
         }

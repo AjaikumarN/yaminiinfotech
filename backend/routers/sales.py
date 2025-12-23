@@ -29,11 +29,14 @@ def create_sales_call(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
-    """Create a sales call record"""
-    if current_user.role != models.UserRole.SALESMAN:
-        raise HTTPException(status_code=403, detail="Only salesmen can create calls")
+    """Create a sales call record (Salesman or Reception)"""
+    if current_user.role not in [models.UserRole.SALESMAN, models.UserRole.RECEPTION, models.UserRole.ADMIN]:
+        raise HTTPException(status_code=403, detail="Only salesmen or reception can create calls")
     
-    return crud.create_sales_call(db=db, call=call, salesman_id=current_user.id)
+    # If reception is logging the call, set salesman_id to None or a default
+    salesman_id = current_user.id if current_user.role == models.UserRole.SALESMAN else None
+    
+    return crud.create_sales_call(db=db, call=call, salesman_id=salesman_id)
 
 @router.post("/visits")
 def create_shop_visit(
@@ -62,6 +65,25 @@ def get_my_calls(
         date = datetime.utcnow().replace(hour=0, minute=0, second=0)
     
     return crud.get_sales_calls_by_salesman(db, salesman_id=current_user.id, date=date)
+
+@router.get("/calls")
+def get_all_calls(
+    today: bool = False,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    """Get all calls (Reception/Admin only)"""
+    if current_user.role not in [models.UserRole.RECEPTION, models.UserRole.ADMIN]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    query = db.query(models.SalesCall)
+    
+    if today:
+        today_date = date.today()
+        query = query.filter(func.date(models.SalesCall.call_date) == today_date)
+    
+    calls = query.order_by(models.SalesCall.call_date.desc()).all()
+    return calls
 
 @router.get("/my-visits")
 def get_my_visits(
@@ -284,9 +306,9 @@ def get_today_followups(
         models.SalesFollowUp.followup_date < today_end
     ).all()
 
-@router.post("/salesman/daily-report", response_model=schemas.SalesDailyReportResponse)
+@router.post("/salesman/daily-report", response_model=schemas.DailyReport)
 def submit_daily_report(
-    report: schemas.SalesDailyReportCreate,
+    report: schemas.DailyReportCreate,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
@@ -314,9 +336,9 @@ def submit_daily_report(
         raise HTTPException(status_code=400, detail="No activity recorded. Either calls or visits must be greater than 0")
     
     # Check for duplicate report
-    existing_report = db.query(models.SalesDailyReport).filter(
-        models.SalesDailyReport.salesman_id == current_user.id,
-        models.SalesDailyReport.date == report_date
+    existing_report = db.query(models.DailyReport).filter(
+        models.DailyReport.salesman_id == current_user.id,
+        models.DailyReport.date == report_date
     ).first()
     
     if existing_report:
@@ -327,7 +349,7 @@ def submit_daily_report(
         raise HTTPException(status_code=400, detail="Invalid revenue. Revenue requires enquiries or orders")
     
     # Create report
-    db_report = models.SalesDailyReport(
+    db_report = models.DailyReport(
         salesman_id=current_user.id,
         date=report_date,
         calls_made=report.calls_made,
@@ -361,9 +383,9 @@ def get_daily_report(
     
     date_obj = datetime.fromisoformat(report_date).date()
     
-    report = db.query(models.SalesDailyReport).filter(
-        models.SalesDailyReport.salesman_id == current_user.id,
-        models.SalesDailyReport.date == date_obj
+    report = db.query(models.DailyReport).filter(
+        models.DailyReport.salesman_id == current_user.id,
+        models.DailyReport.date == date_obj
     ).first()
     
     if not report:

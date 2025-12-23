@@ -4,21 +4,22 @@
  */
 
 export const DASHBOARD_ROUTES = {
-  admin: '/admin/dashboard',
-  reception: '/reception/dashboard',
-  salesman: '/salesman/dashboard',
-  service_engineer: '/engineer/dashboard',
-  office_staff: '/office/dashboard',
-  customer: '/customer' // Customers don't have dashboards in staff portal
+  ADMIN: '/admin/dashboard',
+  RECEPTION: '/reception/dashboard',
+  SALESMAN: '/salesman/dashboard',
+  SERVICE_ENGINEER: '/engineer/dashboard',
+  CUSTOMER: '/customer' // Customers don't have dashboards in staff portal
 }
 
 /**
  * Get the dashboard route for a given role
- * @param {string} role - User role
+ * @param {string} role - User role (UPPERCASE)
  * @returns {string} Dashboard route path
  */
 export function getDashboardRoute(role) {
-  return DASHBOARD_ROUTES[role] || '/'
+  // Handle both uppercase and lowercase for backward compatibility
+  const upperRole = role?.toUpperCase()
+  return DASHBOARD_ROUTES[upperRole] || DASHBOARD_ROUTES[role] || '/'
 }
 
 /**

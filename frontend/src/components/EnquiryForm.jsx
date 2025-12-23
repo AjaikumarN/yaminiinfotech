@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import { apiRequest } from '../utils/api';
 
 const EnquiryForm = () => {
   const { productId } = useParams();
@@ -30,8 +30,8 @@ const EnquiryForm = () => {
 
   const fetchProduct = async () => {
     try {
-      const response = await axios.get(`http://127.0.0.1:8000/api/products/${productId}`);
-      setProduct(response.data);
+      const data = await apiRequest(`/api/products/${productId}`);
+      setProduct(data);
     } catch (error) {
       console.error('Failed to fetch product:', error);
     }
@@ -88,13 +88,21 @@ const EnquiryForm = () => {
 
     try {
       const payload = {
-        ...formData,
+        customer_name: formData.customer_name,
+        phone: formData.phone,
+        email: formData.email || null,
         product_id: productId ? parseInt(productId) : null,
+        product_interest: product ? product.name : null,
+        description: formData.enquiry_details,
+        notes: formData.address ? `Address: ${formData.address}\nCompany: ${formData.company_name || 'N/A'}` : null,
         source: 'website',
         priority: 'HOT' // New enquiries from website start as HOT
       };
 
-      await axios.post('http://127.0.0.1:8000/api/enquiries', payload);
+      await apiRequest('/api/enquiries/', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
       setSubmitted(true);
       
       // Redirect to success page after 3 seconds
@@ -128,7 +136,7 @@ const EnquiryForm = () => {
           </button>
         </div>
 
-        <style jsx>{`
+        <style>{`
           .success-page {
             min-height: 100vh;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -368,7 +376,7 @@ const EnquiryForm = () => {
         </div>
       </div>
 
-      <style jsx>{`
+      <style>{`
         .enquiry-form-page {
           min-height: 100vh;
           background: #f8f9fa;

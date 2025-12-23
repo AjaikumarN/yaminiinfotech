@@ -5,12 +5,12 @@ export const AuthContext = createContext()
 
 // Role hierarchy and permissions
 const ROLES = {
-  ADMIN: 'admin',
-  RECEPTION: 'reception',
-  SALESMAN: 'salesman',
-  SERVICE_ENGINEER: 'service_engineer',
-  OFFICE_STAFF: 'office_staff',
-  CUSTOMER: 'customer'
+  ADMIN: 'ADMIN',
+  RECEPTION: 'RECEPTION',
+  SALESMAN: 'SALESMAN',
+  SERVICE_ENGINEER: 'SERVICE_ENGINEER',
+  OFFICE_STAFF: 'OFFICE_STAFF',
+  CUSTOMER: 'CUSTOMER'
 }
 
 const PERMISSIONS = {

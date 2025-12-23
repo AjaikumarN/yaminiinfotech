@@ -5,6 +5,8 @@ Handles:
 2. Daily Report Submission Tracking
 3. Service SLA Warning System
 4. Monthly AMC Reminder Automation
+
+PHASE 4: Uses centralized NotificationService
 """
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -16,6 +18,7 @@ from models import (
     Enquiry, DailyReport, Complaint, MIFRecord, 
     Notification, ReminderSchedule, User, UserRole
 )
+from notification_service import NotificationService
 import logging
 
 logger = logging.getLogger(__name__)
@@ -146,19 +149,26 @@ def check_daily_reports():
             # Check if daily report exists
             report = db.query(DailyReport).filter(
                 DailyReport.salesman_id == salesman.id,
-                DailyReport.report_date == today
+                DailyReport.date == yesterday
             ).first()
             
-            if not report or not report.report_submitted:
+            if not report:
                 missing_reports.append(salesman)
+                
+                # PHASE 4: Use NotificationService
+                NotificationService.notify_daily_report_missing(
+                    db=db,
+                    salesman=salesman,
+                    date=yesterday
+                )
                 
                 # Notify reception staff
                 for reception in reception_users:
-                    create_notification(
+                    NotificationService.create_notification(
                         db=db,
                         user_id=reception.id,
                         title="⚠️ Missing Daily Report",
-                        message=f"Salesman {salesman.full_name or salesman.username} has not submitted today's report",
+                        message=f"Salesman {salesman.full_name or salesman.username} has not submitted yesterday's report",
                         notification_type="MISSED_REPORT",
                         priority="high",
                         module="Daily Reports",

@@ -14,6 +14,7 @@ export default function Login() {
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   const from = location.state?.from?.pathname || '/'
 
@@ -30,10 +31,11 @@ export default function Login() {
         const redirectPath = getPostLoginRedirect(result.user.role, from)
         navigate(redirectPath, { replace: true })
       } else {
-        setError(result.error)
+        setError(result.error || 'Login failed. Please check your credentials.')
       }
     } catch (err) {
-      setError('An error occurred. Please try again.')
+      console.error('Login error:', err)
+      setError(err.message || 'An error occurred. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -74,15 +76,25 @@ export default function Login() {
 
           <div className="form-group">
             <label htmlFor="password">Password</label>
-            <input
-              id="password"
-              type="password"
-              value={credentials.password}
-              onChange={(e) => setCredentials({...credentials, password: e.target.value})}
-              placeholder="Enter your password"
-              required
-              autoComplete="current-password"
-            />
+            <div className="password-input-wrapper">
+              <input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                value={credentials.password}
+                onChange={(e) => setCredentials({...credentials, password: e.target.value})}
+                placeholder="Enter your password"
+                required
+                autoComplete="current-password"
+              />
+              <button
+                type="button"
+                className="toggle-password"
+                onClick={() => setShowPassword(!showPassword)}
+                tabIndex="-1"
+              >
+                {showPassword ? '👁️' : '👁️‍🗨️'}
+              </button>
+            </div>
           </div>
 
           <button type="submit" className="btn-login" disabled={loading}>
@@ -165,6 +177,13 @@ export default function Login() {
           display: flex;
           align-items: center;
           gap: 10px;
+          animation: shake 0.5s;
+        }
+
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+          20%, 40%, 60%, 80% { transform: translateX(5px); }
         }
 
         .form-group {
@@ -176,6 +195,37 @@ export default function Login() {
           margin-bottom: 8px;
           font-weight: 600;
           color: #2c3e50;
+        }
+
+        .password-input-wrapper {
+          position: relative;
+        }
+
+        .password-input-wrapper input {
+          width: 100%;
+          padding: 12px 45px 12px 15px;
+          border: 2px solid #e0e0e0;
+          border-radius: 8px;
+          font-size: 15px;
+          transition: all 0.3s;
+        }
+
+        .toggle-password {
+          position: absolute;
+          right: 10px;
+          top: 50%;
+          transform: translateY(-50%);
+          background: none;
+          border: none;
+          font-size: 18px;
+          cursor: pointer;
+          padding: 5px;
+          opacity: 0.6;
+          transition: opacity 0.3s;
+        }
+
+        .toggle-password:hover {
+          opacity: 1;
         }
 
         .form-group input {

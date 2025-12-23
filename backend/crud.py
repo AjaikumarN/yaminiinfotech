@@ -58,9 +58,29 @@ def get_customer(db: Session, customer_id: int):
 # Enquiry CRUD
 def create_enquiry(db: Session, enquiry: schemas.EnquiryCreate, created_by: str):
     enquiry_id = generate_id("ENQ", db, models.Enquiry, "enquiry_id")
+    
+    # Convert Pydantic model to dict
+    enquiry_data = enquiry.dict()
+    
+    # If product_id is provided, fetch product name
+    if enquiry_data.get('product_id'):
+        product = db.query(models.Product).filter(
+            models.Product.id == enquiry_data['product_id']
+        ).first()
+        if product:
+            enquiry_data['product_interest'] = product.name
+    
+    # Handle description field (map to notes)
+    if 'description' in enquiry_data and enquiry_data['description']:
+        if enquiry_data.get('notes'):
+            enquiry_data['notes'] += f"\n\nCustomer Message: {enquiry_data['description']}"
+        else:
+            enquiry_data['notes'] = enquiry_data['description']
+        del enquiry_data['description']
+    
     db_enquiry = models.Enquiry(
         enquiry_id=enquiry_id,
-        **enquiry.dict(),
+        **enquiry_data,
         created_by=created_by
     )
     db.add(db_enquiry)
@@ -302,7 +322,7 @@ def create_notification(db: Session, notification: schemas.NotificationCreate):
 def get_notifications_by_user(db: Session, user_id: int, unread_only: bool = False):
     query = db.query(models.Notification).filter(models.Notification.user_id == user_id)
     if unread_only:
-        query = query.filter(models.Notification.read == False)
+        query = query.filter(models.Notification.read_status == False)
     return query.order_by(models.Notification.created_at.desc()).all()
 
 def mark_notification_read(db: Session, notification_id: int):
@@ -310,6 +330,6 @@ def mark_notification_read(db: Session, notification_id: int):
         models.Notification.id == notification_id
     ).first()
     if db_notification:
-        db_notification.read = True
+        db_notification.read_status = True
         db.commit()
     return db_notification

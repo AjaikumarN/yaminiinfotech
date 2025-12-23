@@ -5,32 +5,26 @@ import { NotificationProvider } from './contexts/NotificationContext.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import Header from './components/Header.jsx'
 import Footer from './components/Footer.jsx'
-import Notifications from './components/Notifications.jsx'
 import Login from './components/Login.jsx'
 import Home from './components/Home.jsx'
 import Contact from './components/Contact.jsx'
-import Admin from './components/Admin.jsx'
-import Employees from './components/Employees.jsx'
 import Customer from './components/Customer.jsx'
-import Receipt from './components/Receipt.jsx'
 import SalesService from './components/SalesService.jsx'
 import AboutUs from './components/AboutUs.jsx'
-import OfficeStaff from './components/OfficeStaff.jsx'
 import Blog from './components/Blog.jsx'
 
 // New Components
 import ProductListing from './components/ProductListing.jsx'
 import ProductDetail from './components/ProductDetail.jsx'
 import EnquiryForm from './components/EnquiryForm.jsx'
-import ReceptionDashboard from './components/ReceptionDashboard.jsx'
-import SalesmanDashboard from './components/SalesmanDashboardNew.jsx'
+import ReceptionDashboardNew from './components/ReceptionDashboardNew.jsx'
+import SalesmanDashboard from './components/SalesmanDashboard.jsx'
 import SalesmanEnquiries from './components/SalesmanEnquiries.jsx'
 import SalesmanFollowUps from './components/SalesmanFollowUps.jsx'
 import SalesmanVisits from './components/SalesmanVisits.jsx'
 import SalesmanDailyReport from './components/SalesmanDailyReport.jsx'
 import SalesmanAttendance from './components/SalesmanAttendance.jsx'
 import ServiceEngineerDashboard from './components/ServiceEngineerDashboard.jsx'
-import OfficeStaffDashboard from './components/OfficeStaffDashboard.jsx'
 import AdminDashboard from './components/AdminDashboard.jsx'
 import AdminSalesPerformance from './components/AdminSalesPerformance.jsx'
 import AddProduct from './components/AddProduct.jsx'
@@ -52,10 +46,6 @@ export default function App() {
               showNotificationPanel={showNotificationPanel}
               setShowNotificationPanel={setShowNotificationPanel}
             />
-            <Notifications 
-              showPanel={showNotificationPanel}
-              setShowPanel={setShowNotificationPanel}
-            />
             <Routes>
               {/* Public routes */}
               <Route path="/" element={<Home />} />
@@ -73,7 +63,7 @@ export default function App() {
               <Route 
                 path="/customer" 
                 element={
-                  <ProtectedRoute allowedRoles={['customer', 'admin']}>
+                  <ProtectedRoute allowedRoles={['CUSTOMER', 'ADMIN']}>
                     <Customer />
                   </ProtectedRoute>
                 } 
@@ -82,8 +72,8 @@ export default function App() {
               <Route 
                 path="/reception" 
                 element={
-                  <ProtectedRoute allowedRoles={['reception', 'admin']}>
-                    <Receipt />
+                  <ProtectedRoute allowedRoles={['RECEPTION', 'ADMIN']}>
+                    <ReceptionDashboardNew />
                   </ProtectedRoute>
                 } 
               />
@@ -91,8 +81,8 @@ export default function App() {
               <Route 
                 path="/reception/dashboard" 
                 element={
-                  <ProtectedRoute allowedRoles={['reception', 'admin']}>
-                    <ReceptionDashboard />
+                  <ProtectedRoute allowedRoles={['RECEPTION', 'ADMIN']}>
+                    <ReceptionDashboardNew />
                   </ProtectedRoute>
                 } 
               />
@@ -100,7 +90,7 @@ export default function App() {
               <Route 
                 path="/employee/salesman" 
                 element={
-                  <ProtectedRoute allowedRoles={['salesman', 'admin']}>
+                  <ProtectedRoute allowedRoles={['SALESMAN', 'ADMIN']}>
                     <SalesService />
                   </ProtectedRoute>
                 } 
@@ -109,7 +99,7 @@ export default function App() {
               <Route 
                 path="/salesman/dashboard" 
                 element={
-                  <ProtectedRoute allowedRoles={['salesman', 'admin']}>
+                  <ProtectedRoute allowedRoles={['SALESMAN', 'ADMIN']}>
                     <SalesmanDashboard />
                   </ProtectedRoute>
                 } 
@@ -118,7 +108,7 @@ export default function App() {
               <Route 
                 path="/salesman/followups" 
                 element={
-                  <ProtectedRoute allowedRoles={['salesman', 'admin']}>
+                  <ProtectedRoute allowedRoles={['SALESMAN', 'ADMIN']}>
                     <SalesmanFollowUps />
                   </ProtectedRoute>
                 } 
@@ -127,7 +117,7 @@ export default function App() {
               <Route 
                 path="/salesman/visits" 
                 element={
-                  <ProtectedRoute allowedRoles={['salesman', 'admin']}>
+                  <ProtectedRoute allowedRoles={['SALESMAN', 'ADMIN']}>
                     <SalesmanVisits />
                   </ProtectedRoute>
                 } 
@@ -136,7 +126,7 @@ export default function App() {
               <Route 
                 path="/salesman/daily-report" 
                 element={
-                  <ProtectedRoute allowedRoles={['salesman', 'admin']}>
+                  <ProtectedRoute allowedRoles={['SALESMAN', 'ADMIN']}>
                     <SalesmanDailyReport />
                   </ProtectedRoute>
                 } 
@@ -145,7 +135,7 @@ export default function App() {
               <Route 
                 path="/salesman/attendance" 
                 element={
-                  <ProtectedRoute allowedRoles={['salesman', 'admin']}>
+                  <ProtectedRoute allowedRoles={['SALESMAN', 'ADMIN']}>
                     <SalesmanAttendance />
                   </ProtectedRoute>
                 } 
@@ -154,7 +144,7 @@ export default function App() {
               <Route 
                 path="/salesman/enquiries" 
                 element={
-                  <ProtectedRoute allowedRoles={['salesman', 'admin']}>
+                  <ProtectedRoute allowedRoles={['SALESMAN', 'ADMIN']}>
                     <SalesmanEnquiries />
                   </ProtectedRoute>
                 } 
@@ -163,7 +153,7 @@ export default function App() {
               <Route 
                 path="/salesman/performance" 
                 element={
-                  <ProtectedRoute allowedRoles={['salesman', 'admin']}>
+                  <ProtectedRoute allowedRoles={['SALESMAN', 'ADMIN']}>
                     <SalesmanDashboard />
                   </ProtectedRoute>
                 } 
@@ -172,8 +162,8 @@ export default function App() {
               <Route 
                 path="/employee/service-engineer" 
                 element={
-                  <ProtectedRoute allowedRoles={['service_engineer', 'admin']}>
-                    <Employees />
+                  <ProtectedRoute allowedRoles={['SERVICE_ENGINEER', 'ADMIN']}>
+                    <ServiceEngineerDashboard />
                   </ProtectedRoute>
                 } 
               />
@@ -181,26 +171,8 @@ export default function App() {
               <Route 
                 path="/engineer/dashboard" 
                 element={
-                  <ProtectedRoute allowedRoles={['service_engineer', 'admin']}>
+                  <ProtectedRoute allowedRoles={['SERVICE_ENGINEER', 'ADMIN']}>
                     <ServiceEngineerDashboard />
-                  </ProtectedRoute>
-                } 
-              />
-              
-              <Route 
-                path="/employee/office-staff" 
-                element={
-                  <ProtectedRoute allowedRoles={['office_staff', 'admin']}>
-                    <OfficeStaff />
-                  </ProtectedRoute>
-                } 
-              />
-              
-              <Route 
-                path="/office/dashboard" 
-                element={
-                  <ProtectedRoute allowedRoles={['office_staff', 'admin']}>
-                    <OfficeStaffDashboard />
                   </ProtectedRoute>
                 } 
               />
@@ -208,7 +180,7 @@ export default function App() {
               <Route 
                 path="/products/add" 
                 element={
-                  <ProtectedRoute allowedRoles={['office_staff', 'admin']}>
+                  <ProtectedRoute allowedRoles={['ADMIN']}>
                     <AddProduct />
                   </ProtectedRoute>
                 } 
@@ -217,7 +189,7 @@ export default function App() {
               <Route 
                 path="/products/edit/:productId" 
                 element={
-                  <ProtectedRoute allowedRoles={['office_staff', 'admin']}>
+                  <ProtectedRoute allowedRoles={['ADMIN']}>
                     <AddProduct />
                   </ProtectedRoute>
                 } 
@@ -226,8 +198,8 @@ export default function App() {
               <Route 
                 path="/admin" 
                 element={
-                  <ProtectedRoute allowedRoles={['admin']}>
-                    <Admin />
+                  <ProtectedRoute allowedRoles={['ADMIN']}>
+                    <AdminDashboard />
                   </ProtectedRoute>
                 } 
               />
@@ -235,7 +207,7 @@ export default function App() {
               <Route 
                 path="/admin/dashboard" 
                 element={
-                  <ProtectedRoute allowedRoles={['admin']}>
+                  <ProtectedRoute allowedRoles={['ADMIN']}>
                     <AdminDashboard />
                   </ProtectedRoute>
                 } 
@@ -244,7 +216,7 @@ export default function App() {
               <Route 
                 path="/admin/sales-performance" 
                 element={
-                  <ProtectedRoute allowedRoles={['admin', 'office_staff']}>
+                  <ProtectedRoute allowedRoles={['ADMIN', 'RECEPTION']}>
                     <AdminSalesPerformance />
                   </ProtectedRoute>
                 } 

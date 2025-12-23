@@ -1,9 +1,13 @@
-import React, { useState } from 'react'
-import { useNotifications } from '../contexts/NotificationContext'
+import React, { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 
-export default function Notifications({ showPanel, setShowPanel }) {
-  const { notifications, notificationHistory, unreadCount, markAsRead, removeNotification, clearAll, clearHistory } = useNotifications()
+export default function Notifications({ showPanel, setShowPanel, backendNotifications = [], allNotifications = [], markAsRead, refreshNotifications }) {
   const [viewTab, setViewTab] = useState('active')
+  const navigate = useNavigate()
+  
+  // backendNotifications are already filtered for unread (from API with ?unread_only=true)
+  const unreadNotifications = backendNotifications
+  const unreadCount = unreadNotifications.length
 
   const getNotificationColor = (type) => {
     const colors = {
@@ -17,55 +21,33 @@ export default function Notifications({ showPanel, setShowPanel }) {
     return colors[type] || '#95a5a6'
   }
 
-  const handleNotificationClick = (notification) => {
-    if (!notification.read) {
-      markAsRead(notification.id)
+  const handleNotificationClick = async (notification) => {
+    if (!notification.read_status && markAsRead) {
+      await markAsRead(notification.id)
+    }
+    // Navigate to action URL if present
+    if (notification.action_url) {
+      setShowPanel(false)
+      // Handle internal routing
+      if (notification.action_url.startsWith('/')) {
+        navigate(notification.action_url)
+      }
     }
   }
 
   return (
-    <div className="notifications-system">
-      {/* Toast Notifications */}
-      <div className="toast-container">
-        {notifications.map(notif => (
-          <div 
-            key={notif.id} 
-            className={`toast-notification ${notif.type}`}
-            style={{ borderLeft: `4px solid ${getNotificationColor(notif.type)}` }}
-          >
-            <div className="toast-content">
-              <div className="toast-title">{notif.title}</div>
-              <div className="toast-message">{notif.message}</div>
-              {notif.actionUrl && (
-                <small className="toast-action">Click to view details</small>
-              )}
-            </div>
+    <>
+      {showPanel && (
+        <div className="notification-panel">
+          <div className="panel-header">
+            <h3>Notifications</h3>
             <button 
-              className="toast-close"
-              onClick={() => removeNotification(notif.id)}
+              className="close-panel"
+              onClick={() => setShowPanel(false)}
             >
               ✕
             </button>
           </div>
-        ))}
-      </div>
-
-      {/* Notification Bell Icon */}
-      {/* Bell button moved to Header component */}
-
-      {/* Notification Panel */}
-      <div style={{ display: showPanel ? 'block' : 'none' }}>
-        {showPanel && (
-          <div className="notification-panel">
-            <div className="panel-header">
-              <h3>Notifications</h3>
-              <button 
-                className="close-panel"
-                onClick={() => setShowPanel(false)}
-              >
-                ✕
-              </button>
-            </div>
 
             <div className="panel-tabs">
               <button 
@@ -85,19 +67,19 @@ export default function Notifications({ showPanel, setShowPanel }) {
             <div className="panel-content">
               {viewTab === 'active' && (
                 <>
-                  {notifications.length === 0 ? (
+                  {unreadNotifications.length === 0 ? (
                     <div className="empty-state">
                       <span className="empty-icon">📭</span>
                       <p>No active notifications</p>
                     </div>
                   ) : (
                     <div className="notification-list">
-                      {notifications.map(notif => (
+                      {unreadNotifications.map(notif => (
                         <div 
                           key={notif.id}
-                          className={`notification-item ${notif.type} ${notif.read ? 'read' : 'unread'}`}
+                          className={`notification-item ${notif.notification_type} ${notif.read_status ? 'read' : 'unread'}`}
                           onClick={() => handleNotificationClick(notif)}
-                          style={{ borderLeft: `4px solid ${getNotificationColor(notif.type)}` }}
+                          style={{ borderLeft: `4px solid ${getNotificationColor(notif.priority)}` }}
                         >
                           <div className="notif-priority">
                             <span className={`priority-indicator ${notif.priority}`}></span>
@@ -107,7 +89,7 @@ export default function Notifications({ showPanel, setShowPanel }) {
                             <div className="notif-message">{notif.message}</div>
                             <div className="notif-meta">
                               <span className="notif-time">
-                                {new Date(notif.timestamp).toLocaleTimeString()}
+                                {new Date(notif.created_at).toLocaleTimeString()}
                               </span>
                               <span className="notif-module">{notif.module}</span>
                             </div>
@@ -116,24 +98,13 @@ export default function Notifications({ showPanel, setShowPanel }) {
                             className="notif-remove"
                             onClick={(e) => {
                               e.stopPropagation()
-                              removeNotification(notif.id)
+                              markAsRead && markAsRead(notif.id)
                             }}
                           >
-                            ✕
+                            ✓
                           </button>
                         </div>
                       ))}
-                    </div>
-                  )}
-
-                  {notifications.length > 0 && (
-                    <div className="panel-footer">
-                      <button 
-                        className="clear-button"
-                        onClick={() => clearAll()}
-                      >
-                        Clear All
-                      </button>
                     </div>
                   )}
                 </>
@@ -141,25 +112,26 @@ export default function Notifications({ showPanel, setShowPanel }) {
 
               {viewTab === 'history' && (
                 <>
-                  {notificationHistory.length === 0 ? (
+                  {allNotifications.length === 0 ? (
                     <div className="empty-state">
                       <span className="empty-icon">📚</span>
                       <p>No notification history</p>
                     </div>
                   ) : (
                     <div className="notification-list history">
-                      {notificationHistory.slice(0, 50).map(notif => (
+                      {allNotifications.slice(0, 50).map(notif => (
                         <div 
                           key={notif.id}
-                          className={`notification-item ${notif.type} ${notif.read ? 'read' : 'unread'}`}
-                          style={{ borderLeft: `4px solid ${getNotificationColor(notif.type)}` }}
+                          className={`notification-item ${notif.notification_type} ${notif.read_status ? 'read' : 'unread'}`}
+                          style={{ borderLeft: `4px solid ${getNotificationColor(notif.priority)}` }}
+                          onClick={() => handleNotificationClick(notif)}
                         >
                           <div className="notif-content">
                             <div className="notif-title">{notif.title}</div>
                             <div className="notif-message">{notif.message}</div>
                             <div className="notif-meta">
                               <span className="notif-time">
-                                {new Date(notif.timestamp).toLocaleString()}
+                                {new Date(notif.created_at).toLocaleString()}
                               </span>
                               <span className="notif-module">{notif.module}</span>
                             </div>
@@ -168,23 +140,11 @@ export default function Notifications({ showPanel, setShowPanel }) {
                       ))}
                     </div>
                   )}
-
-                  {notificationHistory.length > 0 && (
-                    <div className="panel-footer">
-                      <button 
-                        className="clear-button"
-                        onClick={() => clearHistory()}
-                      >
-                        Clear History
-                      </button>
-                    </div>
-                  )}
                 </>
               )}
             </div>
           </div>
-        )}
-      </div>
+      )}
 
       <style>{`
         .notifications-system {
@@ -301,18 +261,18 @@ export default function Notifications({ showPanel, setShowPanel }) {
         }
 
         .notification-panel {
-          position: absolute;
-          top: 50px;
-          right: 0;
+          position: fixed;
+          top: 70px;
+          right: 20px;
           width: 400px;
           max-width: 100vw;
           background: white;
           border-radius: 10px;
-          box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-          z-index: 1000;
+          box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+          z-index: 9999;
           display: flex;
           flex-direction: column;
-          max-height: 600px;
+          max-height: calc(100vh - 100px);
         }
 
         .panel-header {
@@ -543,6 +503,6 @@ export default function Notifications({ showPanel, setShowPanel }) {
           }
         }
       `}</style>
-    </div>
+    </>
   )
 }

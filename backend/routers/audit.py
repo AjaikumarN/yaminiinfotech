@@ -45,12 +45,12 @@ def get_audit_logs(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Get audit logs (Admin and Office Staff only)"""
+    """Get audit logs (Admin and Reception only)"""
     
-    if current_user.role not in [UserRole.ADMIN, UserRole.OFFICE_STAFF]:
+    if current_user.role not in [UserRole.ADMIN, UserRole.RECEPTION]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only admin and office staff can view audit logs"
+            detail="Only admin and reception can view audit logs"
         )
     
     query = db.query(AuditLog).order_by(AuditLog.timestamp.desc())
@@ -76,12 +76,12 @@ def get_record_history(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Get complete history of a specific record (Admin and Office Staff only)"""
+    """Get complete history of a specific record (Admin and Reception only)"""
     
-    if current_user.role not in [UserRole.ADMIN, UserRole.OFFICE_STAFF]:
+    if current_user.role not in [UserRole.ADMIN, UserRole.RECEPTION]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only admin and office staff can view audit logs"
+            detail="Only admin and reception can view audit logs"
         )
     
     logs = db.query(AuditLog).filter(

@@ -21,6 +21,8 @@ from routers import reports
 from routers import audit
 from routers import orders
 from routers import admin_sales
+from routers import visitors
+from routers import stock_movements
 
 
 # Lifespan context manager for startup/shutdown
@@ -74,6 +76,8 @@ app.include_router(notifications.router)
 app.include_router(bookings.router)
 app.include_router(reports.router)
 app.include_router(audit.router)
+app.include_router(visitors.router)
+app.include_router(stock_movements.router)
 
 @app.get("/")
 def read_root():

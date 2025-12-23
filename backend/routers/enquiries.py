@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 import schemas
 import crud
 import models
 import auth
 from database import get_db
+from notification_service import NotificationService
 
 router = APIRouter(prefix="/api/enquiries", tags=["Enquiries"])
 
@@ -13,10 +14,28 @@ router = APIRouter(prefix="/api/enquiries", tags=["Enquiries"])
 def create_enquiry(
     enquiry: schemas.EnquiryCreate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user)
+    current_user: Optional[models.User] = Depends(auth.get_current_user_optional)
 ):
-    """Create a new enquiry"""
-    return crud.create_enquiry(db=db, enquiry=enquiry, created_by=current_user.full_name)
+    """Create a new enquiry (Public endpoint - no authentication required for website submissions)"""
+    # Determine who created the enquiry
+    created_by_name = current_user.full_name if current_user else "Website Visitor"
+    
+    # Create enquiry
+    new_enquiry = crud.create_enquiry(db=db, enquiry=enquiry, created_by=created_by_name)
+    
+    # Send notifications for all enquiry submissions (internal and public)
+    try:
+        NotificationService.notify_enquiry_created(
+            db=db,
+            enquiry=new_enquiry,
+            created_by_name=created_by_name
+        )
+    except Exception as e:
+        # Log error but don't fail the request
+        import logging
+        logging.error(f"Failed to send enquiry notifications: {e}")
+    
+    return new_enquiry
 
 @router.get("/", response_model=List[schemas.Enquiry])
 def get_enquiries(
@@ -26,40 +45,63 @@ def get_enquiries(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
-    """Get enquiries - Reception sees all, Salesman sees only assigned ones"""
-    if current_user.role == models.UserRole.SALESMAN:
-        # Salesmen can only see enquiries assigned to them
-        if assigned_to and assigned_to != current_user.id:
-            raise HTTPException(status_code=403, detail="Cannot view other salesmen's enquiries")
-        return crud.get_enquiries_by_salesman(db, salesman_id=current_user.id)
-    elif current_user.role in [models.UserRole.RECEPTION, models.UserRole.ADMIN]:
-        # Reception and admin can see all enquiries
+    """Get enquiries (Backend enforced: Reception=all, Salesman=assigned only)"""
+    
+    # Build base query
+    query = db.query(models.Enquiry)
+    
+    # Apply role-based filtering (Backend enforcement)
+    query = auth.filter_enquiries_by_role(current_user, query)
+    
+    # Apply additional filters for Admin/Reception
+    if current_user.role in [models.UserRole.ADMIN, models.UserRole.RECEPTION]:
         if assigned_to:
-            return crud.get_enquiries_by_salesman(db, salesman_id=assigned_to)
-        return crud.get_enquiries(db, skip=skip, limit=limit)
-    else:
-        raise HTTPException(status_code=403, detail="Permission denied")
+            query = query.filter(models.Enquiry.assigned_to == assigned_to)
+    
+    # Execute with pagination
+    enquiries = query.offset(skip).limit(limit).all()
+    return enquiries
 
 @router.put("/{enquiry_id}", response_model=schemas.Enquiry)
 def update_enquiry(
     enquiry_id: int,
     enquiry: schemas.EnquiryUpdate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.require_permission("manage_reception"))
+    current_user: models.User = Depends(auth.require_enquiry_write)  # Admin + Reception
 ):
-    """Update enquiry (Reception only)"""
-    updated = crud.update_enquiry(db, enquiry_id=enquiry_id, enquiry=enquiry)
-    if not updated:
+    """Update enquiry (Admin + Reception only - Backend enforced)"""
+    # Get the old enquiry to check if assignment changed
+    old_enquiry = db.query(models.Enquiry).filter(models.Enquiry.id == enquiry_id).first()
+    if not old_enquiry:
         raise HTTPException(status_code=404, detail="Enquiry not found")
+    
+    old_assigned_to = old_enquiry.assigned_to
+    
+    # Update enquiry
+    updated = crud.update_enquiry(db, enquiry_id=enquiry_id, enquiry=enquiry)
+    
+    # PHASE 4: Send notification if assignment changed
+    if enquiry.assigned_to and enquiry.assigned_to != old_assigned_to:
+        try:
+            NotificationService.notify_enquiry_created(
+                db=db,
+                enquiry=updated,
+                created_by_name=current_user.full_name
+            )
+        except Exception as e:
+            # Log error but don't fail the request
+            import logging
+            logging.error(f"Failed to send enquiry assignment notifications: {e}")
+    
     return updated
 
 @router.delete("/{enquiry_id}")
 def delete_enquiry(
     enquiry_id: int,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.require_permission("manage_reception"))
+    current_user: models.User = Depends(auth.require_enquiry_write)  # Admin + Reception
 ):
-    """Delete enquiry (Reception only)"""
+    """Delete enquiry (Admin + Reception only - Backend enforced)"""
     enquiry = db.query(models.Enquiry).filter(models.Enquiry.id == enquiry_id).first()
     if not enquiry:
         raise HTTPException(status_code=404, detail="Enquiry not found")

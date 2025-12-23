@@ -329,7 +329,7 @@ async def check_user_permissions(
     # Map UserRole enum to role name
     role_name_map = {
         "admin": "ADMIN",
-        "office_staff": "OFFICE_STAFF",
+
         "reception": "RECEPTION",
         "salesman": "SALESMAN",
         "service_engineer": "SERVICE_ENGINEER",
