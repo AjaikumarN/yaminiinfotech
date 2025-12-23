@@ -87,6 +87,16 @@ export default function App() {
                 } 
               />
               
+              {/* Enquiry routes - redirect to reception dashboard */}
+              <Route 
+                path="/enquiries/:enquiryId" 
+                element={
+                  <ProtectedRoute allowedRoles={['RECEPTION', 'ADMIN', 'SALESMAN']}>
+                    <ReceptionDashboardNew />
+                  </ProtectedRoute>
+                } 
+              />
+              
               <Route 
                 path="/employee/salesman" 
                 element={
