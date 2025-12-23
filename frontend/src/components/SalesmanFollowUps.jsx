@@ -163,9 +163,9 @@ const SalesmanFollowUps = () => {
                   <div className="card-actions">
                     <button 
                       className="btn-primary"
-                      onClick={() => navigate(`/salesman/enquiries/${followup.enquiry_id}`)}
+                      onClick={() => navigate(`/enquiries/${followup.enquiry_id}`)}
                     >
-                      View Enquiry
+                      View Details
                     </button>
                     {followup.status === 'Pending' && (
                       <button 

@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useContext } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../contexts/AuthContext';
 import { apiRequest } from '../utils/api';
 import CreateOrder from './CreateOrder';
 
 const SalesmanEnquiries = () => {
+  const navigate = useNavigate();
   const { user } = useContext(AuthContext);
   const [enquiries, setEnquiries] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -134,7 +136,12 @@ const SalesmanEnquiries = () => {
           </div>
         ) : (
           enquiries.map((enquiry) => (
-            <div key={enquiry.id} className="enquiry-card">
+            <div 
+              key={enquiry.id} 
+              className="enquiry-card"
+              onClick={() => navigate(`/enquiries/${enquiry.id}`)}
+              style={{ cursor: 'pointer' }}
+            >
               <div className="card-header">
                 <div className="enquiry-info">
                   <h3>{enquiry.customer_name}</h3>
@@ -186,10 +193,23 @@ const SalesmanEnquiries = () => {
               </div>
 
               <div className="card-footer">
+                <button
+                  className="btn-view-details"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/enquiries/${enquiry.id}`);
+                  }}
+                >
+                  👁️ View Details
+                </button>
+                
                 {canCreateOrder(enquiry) && (
                   <button
                     className="btn-create-order"
-                    onClick={() => openCreateOrder(enquiry)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openCreateOrder(enquiry);
+                    }}
                   >
                     🛒 Create Order
                   </button>
@@ -200,7 +220,10 @@ const SalesmanEnquiries = () => {
                     <select
                       className="status-select"
                       value={enquiry.status}
-                      onChange={(e) => handleUpdateStatus(enquiry.id, e.target.value)}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        handleUpdateStatus(enquiry.id, e.target.value);
+                      }}
                     >
                       <option value="NEW">New</option>
                       <option value="CONTACTED">Contacted</option>
@@ -322,8 +345,7 @@ const SalesmanEnquiries = () => {
           border-radius: 12px;
           overflow: hidden;
           box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-          transition: all 0.3s;
-        }
+          transition: all 0.3s;          cursor: pointer;        }
 
         .enquiry-card:hover {
           transform: translateY(-4px);
@@ -394,6 +416,26 @@ const SalesmanEnquiries = () => {
           gap: 15px;
           justify-content: space-between;
           align-items: center;
+          flex-wrap: wrap;
+        }
+
+        .btn-view-details {
+          padding: 12px 24px;
+          background: #3498db;
+          color: white;
+          border: none;
+          border-radius: 8px;
+          font-weight: 700;
+          cursor: pointer;
+          font-size: 14px;
+          transition: all 0.3s;
+          flex: 1;
+          min-width: 140px;
+        }
+
+        .btn-view-details:hover {
+          background: #2980b9;
+          transform: scale(1.02);
         }
 
         .btn-create-order {
@@ -407,6 +449,7 @@ const SalesmanEnquiries = () => {
           font-size: 14px;
           transition: all 0.3s;
           flex: 1;
+          min-width: 140px;
         }
 
         .btn-create-order:hover {

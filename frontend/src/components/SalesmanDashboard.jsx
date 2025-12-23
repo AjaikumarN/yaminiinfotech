@@ -210,9 +210,9 @@ const SalesmanDashboard = () => {
                     <div className="followup-actions">
                       <button 
                         className="btn-primary"
-                        onClick={() => navigate(`/salesman/enquiries/${followup.enquiry_id}`)}
+                        onClick={() => navigate(`/enquiries/${followup.enquiry_id}`)}
                       >
-                        View Enquiry
+                        View Details
                       </button>
                       <button 
                         className="btn-success"
