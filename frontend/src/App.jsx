@@ -17,6 +17,7 @@ import Blog from './components/Blog.jsx'
 import ProductListing from './components/ProductListing.jsx'
 import ProductDetail from './components/ProductDetail.jsx'
 import EnquiryForm from './components/EnquiryForm.jsx'
+import EnquiryDetail from './components/EnquiryDetail.jsx'
 import ReceptionDashboardNew from './components/ReceptionDashboardNew.jsx'
 import SalesmanDashboard from './components/SalesmanDashboard.jsx'
 import SalesmanEnquiries from './components/SalesmanEnquiries.jsx'
@@ -92,7 +93,7 @@ export default function App() {
                 path="/enquiries/:enquiryId" 
                 element={
                   <ProtectedRoute allowedRoles={['RECEPTION', 'ADMIN', 'SALESMAN']}>
-                    <ReceptionDashboardNew />
+                    <EnquiryDetail />
                   </ProtectedRoute>
                 } 
               />

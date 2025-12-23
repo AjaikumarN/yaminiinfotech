@@ -62,6 +62,25 @@ def get_enquiries(
     enquiries = query.offset(skip).limit(limit).all()
     return enquiries
 
+@router.get("/{enquiry_id}", response_model=schemas.Enquiry)
+def get_enquiry_by_id(
+    enquiry_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    """Get a specific enquiry by ID"""
+    enquiry = db.query(models.Enquiry).filter(models.Enquiry.id == enquiry_id).first()
+    
+    if not enquiry:
+        raise HTTPException(status_code=404, detail="Enquiry not found")
+    
+    # Role-based access control
+    if current_user.role == models.UserRole.SALESMAN:
+        if enquiry.assigned_to != current_user.id:
+            raise HTTPException(status_code=403, detail="You can only view enquiries assigned to you")
+    
+    return enquiry
+
 @router.put("/{enquiry_id}", response_model=schemas.Enquiry)
 def update_enquiry(
     enquiry_id: int,
