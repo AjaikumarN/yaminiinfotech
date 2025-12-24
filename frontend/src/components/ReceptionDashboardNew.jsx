@@ -33,6 +33,7 @@ const ReceptionDashboardNew = () => {
   const [showCallForm, setShowCallForm] = useState(false);
   const [showVisitorForm, setShowVisitorForm] = useState(false);
   const [showDeliveryForm, setShowDeliveryForm] = useState(false);
+  const [showServiceForm, setShowServiceForm] = useState(false);
   
   // Form states
   const [callForm, setCallForm] = useState({
@@ -57,6 +58,19 @@ const ReceptionDashboardNew = () => {
     quantity: 1,
     reference: ''
   });
+
+  const [serviceForm, setServiceForm] = useState({
+    customer_name: '',
+    phone: '',
+    address: '',
+    machine_model: '',
+    fault_description: '',
+    priority: 'NORMAL',
+    assigned_to: ''
+  });
+
+  const [customers, setCustomers] = useState([]);
+  const [engineers, setEngineers] = useState([]);
 
   useEffect(() => {
     if (user) {
@@ -88,14 +102,18 @@ const ReceptionDashboardNew = () => {
         salesmenData,
         callsData,
         visitorsData,
-        deliveriesData
+        deliveriesData,
+        customersData,
+        engineersData
       ] = await Promise.all([
         apiRequest('/api/enquiries/').catch(() => []),
         apiRequest('/api/complaints/').catch(() => []),
         apiRequest('/api/users/salesmen/').catch(() => []),
         apiRequest('/api/sales/calls?today=true').catch(() => []),
         apiRequest('/api/visitors/?today=true').catch(() => []),
-        apiRequest('/api/stock-movements/').catch(() => [])
+        apiRequest('/api/stock-movements/').catch(() => []),
+        apiRequest('/api/customers/').catch(() => []),
+        apiRequest('/api/users?role=SERVICE_ENGINEER').catch(() => [])
       ]);
 
       // Group enquiries by priority
@@ -137,6 +155,9 @@ const ReceptionDashboardNew = () => {
       setTodaysCalls(callsData || []);
       setVisitors(visitorsData || []);
       setDeliveries(deliveriesData || []);
+      setSalesmen(salesmenData || []);
+      setCustomers(customersData || []);
+      setEngineers(engineersData || []);
 
       // Update KPIs
       setKpis({
@@ -228,12 +249,9 @@ const ReceptionDashboardNew = () => {
   const logDelivery = async (e) => {
     e.preventDefault();
     try {
-      await apiRequest('/api/stock-movements/', {
+      await apiRequest('/api/stock-movements', {
         method: 'POST',
-        body: JSON.stringify({
-          ...deliveryForm,
-          status: 'COMPLETED'
-        })
+        body: JSON.stringify(deliveryForm)
       });
       setShowDeliveryForm(false);
       setDeliveryForm({
@@ -245,6 +263,33 @@ const ReceptionDashboardNew = () => {
       fetchDashboardData();
     } catch (error) {
       alert('Failed to log delivery');
+    }
+  };
+
+  const createServiceRequest = async (e) => {
+    e.preventDefault();
+    try {
+      await apiRequest('/api/service-requests', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...serviceForm,
+          assigned_to: serviceForm.assigned_to ? parseInt(serviceForm.assigned_to) : null
+        })
+      });
+      setShowServiceForm(false);
+      setServiceForm({
+        customer_name: '',
+        phone: '',
+        address: '',
+        machine_model: '',
+        fault_description: '',
+        priority: 'NORMAL',
+        assigned_to: ''
+      });
+      alert('✅ Service request created successfully!');
+      fetchDashboardData();
+    } catch (error) {
+      alert('❌ Failed to create service request: ' + (error.message || ''));
     }
   };
 
@@ -432,6 +477,9 @@ const ReceptionDashboardNew = () => {
       <div className="dashboard-section">
         <div className="section-header">
           <h2>3️⃣ Pending Service Complaints ({pendingComplaints.length})</h2>
+          <button className="add-btn" onClick={() => setShowServiceForm(true)}>
+            ➕ Add Service Request
+          </button>
         </div>
         <div className="table-container">
           <table>
@@ -479,7 +527,12 @@ const ReceptionDashboardNew = () => {
 
       {/* SECTION 4: REPEAT COMPLAINT ALERT */}
       <div className="dashboard-section alert-section">
-        <h2>4️⃣ Repeat Complaint Alert ({repeatComplaints.length})</h2>
+        <div className="section-header">
+          <h2>4️⃣ Repeat Complaint Alert ({repeatComplaints.length})</h2>
+          <button className="add-btn" onClick={() => setShowServiceForm(true)}>
+            ➕ Add Service Request
+          </button>
+        </div>
         {repeatComplaints.length === 0 ? (
           <div className="alert-empty">✅ No repeat complaints detected</div>
         ) : (
@@ -840,11 +893,109 @@ const ReceptionDashboardNew = () => {
         </div>
       )}
 
+      {/* SERVICE REQUEST FORM MODAL */}
+      {showServiceForm && (
+        <div className="modal-overlay" onClick={() => setShowServiceForm(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3>🔧 Create Service Request</h3>
+            <form onSubmit={createServiceRequest}>
+              <div className="form-group">
+                <label>Customer Name *</label>
+                <input
+                  required
+                  placeholder="Customer name"
+                  value={serviceForm.customer_name}
+                  onChange={(e) => setServiceForm({...serviceForm, customer_name: e.target.value})}
+                />
+              </div>
+              <div className="form-group">
+                <label>Phone *</label>
+                <input
+                  required
+                  type="tel"
+                  placeholder="Contact number"
+                  value={serviceForm.phone}
+                  onChange={(e) => setServiceForm({...serviceForm, phone: e.target.value})}
+                />
+              </div>
+              <div className="form-group">
+                <label>Address</label>
+                <textarea
+                  rows="2"
+                  placeholder="Service location"
+                  value={serviceForm.address}
+                  onChange={(e) => setServiceForm({...serviceForm, address: e.target.value})}
+                />
+              </div>
+              <div className="form-group">
+                <label>Machine Model *</label>
+                <input
+                  required
+                  placeholder="e.g., HP LaserJet Pro"
+                  value={serviceForm.machine_model}
+                  onChange={(e) => setServiceForm({...serviceForm, machine_model: e.target.value})}
+                />
+              </div>
+              <div className="form-group">
+                <label>Fault Description *</label>
+                <textarea
+                  required
+                  rows="3"
+                  placeholder="Describe the issue..."
+                  value={serviceForm.fault_description}
+                  onChange={(e) => setServiceForm({...serviceForm, fault_description: e.target.value})}
+                />
+              </div>
+              <div className="form-group">
+                <label>Priority *</label>
+                <select
+                  required
+                  value={serviceForm.priority}
+                  onChange={(e) => setServiceForm({...serviceForm, priority: e.target.value})}
+                >
+                  <option value="NORMAL">Normal (24h SLA)</option>
+                  <option value="URGENT">Urgent (6h SLA)</option>
+                  <option value="CRITICAL">Critical (2h SLA)</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Assign Engineer (Optional)</label>
+                <select
+                  value={serviceForm.assigned_to}
+                  onChange={(e) => setServiceForm({...serviceForm, assigned_to: e.target.value})}
+                >
+                  <option value="">-- Select Engineer --</option>
+                  {engineers.map(eng => (
+                    <option key={eng.id} value={eng.id}>
+                      {eng.full_name || eng.username}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="btn-secondary" onClick={() => setShowServiceForm(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn-primary">
+                  Create Request
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       <style>{`
+        * {
+          box-sizing: border-box;
+        }
+        
         .reception-dashboard {
           padding: 20px;
           max-width: 1400px;
           margin: 0 auto;
+          background: #ffffff !important;
+          min-height: calc(100vh - 70px);
         }
 
         .dashboard-header {
@@ -874,6 +1025,34 @@ const ReceptionDashboardNew = () => {
           display: flex;
           align-items: center;
           gap: 20px;
+        }
+
+        .action-btn {
+          padding: 10px 20px;
+          background: white;
+          border: 2px solid #3498db;
+          color: #3498db;
+          border-radius: 8px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.3s;
+        }
+
+        .action-btn:hover {
+          background: #3498db;
+          color: white;
+          transform: translateY(-2px);
+        }
+
+        .action-btn.primary {
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white;
+          border: none;
+        }
+
+        .action-btn.primary:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 16px rgba(102, 126, 234, 0.3);
         }
 
         .notification-bell {
@@ -992,6 +1171,23 @@ const ReceptionDashboardNew = () => {
           margin: 0;
         }
 
+        .add-btn {
+          padding: 10px 20px;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white;
+          border: none;
+          border-radius: 8px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.3s;
+          font-size: 14px;
+        }
+
+        .add-btn:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
         .enquiry-kanban {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
@@ -999,9 +1195,10 @@ const ReceptionDashboardNew = () => {
         }
 
         .kanban-column {
-          background: #f8f9fa;
+          background: #ffffff;
           border-radius: 8px;
           padding: 15px;
+          border: 1px solid #e0e0e0;
         }
 
         .kanban-column.hot {
@@ -1060,7 +1257,8 @@ const ReceptionDashboardNew = () => {
         .source-badge {
           font-size: 10px;
           padding: 3px 8px;
-          background: #ecf0f1;
+          background: #ffffff;
+          border: 1px solid #e0e0e0;
           border-radius: 4px;
           color: #7f8c8d;
         }
@@ -1137,12 +1335,13 @@ const ReceptionDashboardNew = () => {
         }
 
         th {
-          background: #f8f9fa;
+          background: #ffffff;
           font-weight: 600;
           font-size: 13px;
           color: #7f8c8d;
           text-transform: uppercase;
           letter-spacing: 0.5px;
+          border-bottom: 2px solid #e0e0e0;
         }
 
         td {
@@ -1150,7 +1349,7 @@ const ReceptionDashboardNew = () => {
         }
 
         tbody tr:hover {
-          background: #f8f9fa;
+          background: #ffffff;
         }
 
         .empty-state {
@@ -1276,12 +1475,13 @@ const ReceptionDashboardNew = () => {
         .btn-sm {
           padding: 4px 12px;
           font-size: 12px;
-          background: #ecf0f1;
+          background: #ffffff;
+          border: 1px solid #e0e0e0;
           color: #2c3e50;
         }
 
         .btn-sm:hover {
-          background: #bdc3c7;
+          background: #e8f4fd;
         }
 
         .modal-overlay {

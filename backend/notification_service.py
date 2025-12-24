@@ -358,6 +358,130 @@ class NotificationService:
         logger.info(f"Created {len(notifications_created)} role-based notifications for roles {roles}")
         return notifications_created
 
+    @staticmethod
+    def notify_service_assigned(
+        db: Session,
+        service: models.Complaint,
+        engineer_id: int
+    ) -> models.Notification:
+        """
+        Notify service engineer when a service request is assigned
+        
+        Args:
+            db: Database session
+            service: Service request/complaint object
+            engineer_id: Engineer user ID
+        
+        Returns:
+            Created notification
+        """
+        priority_label = service.priority or "NORMAL"
+        
+        return NotificationService.create_notification(
+            db=db,
+            user_id=engineer_id,
+            title=f"New {priority_label} Service Assigned",
+            message=f"Service Request #{service.id} has been assigned to you. Customer: {service.customer_name}, Issue: {service.complaint_text[:100]}...",
+            notification_type="service_assigned",
+            priority="high" if priority_label == "CRITICAL" else "medium",
+            module="service_engineer",
+            action_url=f"/service-requests/{service.id}"
+        )
+
+    @staticmethod
+    def notify_service_completed(
+        db: Session,
+        service: models.Complaint,
+        engineer_name: str
+    ) -> List[models.Notification]:
+        """
+        Notify admin and reception when a service is completed
+        
+        Args:
+            db: Database session
+            service: Service request/complaint object
+            engineer_name: Name of the engineer who completed the service
+        
+        Returns:
+            List of created notifications
+        """
+        return NotificationService.notify_role_based(
+            db=db,
+            roles=[models.UserRole.ADMIN, models.UserRole.RECEPTION],
+            title=f"Service Request #{service.id} Completed",
+            message=f"Engineer {engineer_name} has completed service for {service.customer_name}. Feedback link sent to customer.",
+            notification_type="service_completed",
+            priority="medium",
+            module="service_engineer",
+            action_url=f"/service-requests/{service.id}"
+        )
+
+    @staticmethod
+    def notify_sla_breach(
+        db: Session,
+        service: models.Complaint
+    ) -> List[models.Notification]:
+        """
+        Notify admin and reception when SLA is breached
+        
+        Args:
+            db: Database session
+            service: Service request/complaint object
+        
+        Returns:
+            List of created notifications
+        """
+        engineer_name = "Unassigned"
+        if service.assigned_to:
+            engineer = db.query(models.User).filter(models.User.id == service.assigned_to).first()
+            if engineer:
+                engineer_name = engineer.full_name
+        
+        return NotificationService.notify_role_based(
+            db=db,
+            roles=[models.UserRole.ADMIN, models.UserRole.RECEPTION],
+            title=f"⚠️ SLA BREACH - Service #{service.id}",
+            message=f"URGENT: SLA breached for {service.priority} priority service. Customer: {service.customer_name}, Engineer: {engineer_name}",
+            notification_type="sla_breach",
+            priority="high",
+            module="service_engineer",
+            action_url=f"/service-requests/{service.id}"
+        )
+
+    @staticmethod
+    def notify_negative_feedback(
+        db: Session,
+        service: models.Complaint,
+        feedback
+    ) -> List[models.Notification]:
+        """
+        Notify admin and reception when negative feedback is received
+        
+        Args:
+            db: Database session
+            service: Service request/complaint object
+            feedback: Feedback object with rating
+        
+        Returns:
+            List of created notifications
+        """
+        engineer_name = "Unknown"
+        if service.assigned_to:
+            engineer = db.query(models.User).filter(models.User.id == service.assigned_to).first()
+            if engineer:
+                engineer_name = engineer.full_name
+        
+        return NotificationService.notify_role_based(
+            db=db,
+            roles=[models.UserRole.ADMIN, models.UserRole.RECEPTION],
+            title=f"⚠️ Negative Feedback - Service #{service.id}",
+            message=f"Customer gave {feedback.rating}⭐ rating for service by {engineer_name}. Comment: {feedback.comment[:100] if feedback.comment else 'No comment'}",
+            notification_type="negative_feedback",
+            priority="high",
+            module="service_engineer",
+            action_url=f"/service-requests/{service.id}/feedback"
+        )
+
 
 # Helper functions for backward compatibility with existing code
 def create_notification(

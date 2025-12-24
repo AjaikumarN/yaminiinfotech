@@ -105,18 +105,20 @@ def update_enquiry(db: Session, enquiry_id: int, enquiry: schemas.EnquiryUpdate)
 def create_complaint(db: Session, complaint: schemas.ComplaintCreate):
     ticket_no = generate_id("COMP", db, models.Complaint, "ticket_no")
     
-    # Calculate SLA (24 hours for normal priority)
+    # Calculate SLA based on new priority values
     sla_hours = 24
-    if complaint.priority == "High":
-        sla_hours = 12
-    elif complaint.priority == "Urgent":
-        sla_hours = 4
+    if complaint.priority == "CRITICAL":
+        sla_hours = 2
+    elif complaint.priority == "URGENT":
+        sla_hours = 6
+    elif complaint.priority == "NORMAL":
+        sla_hours = 24
     
-    sla_time = datetime.utcnow() + timedelta(hours=sla_hours)
+    sla_due = datetime.utcnow() + timedelta(hours=sla_hours)
     
     db_complaint = models.Complaint(
         ticket_no=ticket_no,
-        sla_time=sla_time,
+        sla_due=sla_due,
         **complaint.dict()
     )
     db.add(db_complaint)

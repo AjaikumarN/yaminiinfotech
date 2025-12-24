@@ -49,3 +49,5 @@ htmlcov/
 # Backup files
 *.backup
 *.bak
+*.txt
+output.txt

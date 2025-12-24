@@ -100,30 +100,63 @@ class Enquiry(EnquiryBase):
     class Config:
         from_attributes = True
 
-# Complaint Schemas
+# Complaint/Service Request Schemas
 class ComplaintBase(BaseModel):
     customer_name: str
     phone: Optional[str] = None
     address: Optional[str] = None
     machine_model: Optional[str] = None
     fault_description: str
-    priority: str = "Normal"
+    priority: str = "NORMAL"  # NORMAL, URGENT, CRITICAL
 
 class ComplaintCreate(ComplaintBase):
     customer_id: Optional[int] = None
+    assigned_to: Optional[int] = None
 
 class ComplaintUpdate(BaseModel):
-    status: Optional[str] = None
+    status: Optional[str] = None  # ASSIGNED, ON_THE_WAY, IN_PROGRESS, ON_HOLD, COMPLETED
+    resolution_notes: Optional[str] = None
+    parts_replaced: Optional[str] = None
     assigned_to: Optional[int] = None
+
+class ServiceCompleteRequest(BaseModel):
+    resolution_notes: str
+    parts_replaced: Optional[str] = None
 
 class Complaint(ComplaintBase):
     id: int
     ticket_no: str
     status: str
     assigned_to: Optional[int]
-    sla_time: datetime
+    sla_time: Optional[datetime]
+    sla_warning_sent: bool
+    sla_breach_notified: bool
     created_at: datetime
     completed_at: Optional[datetime]
+    resolution_notes: Optional[str] = None
+    parts_replaced: Optional[str] = None
+    feedback_url: Optional[str] = None
+    feedback_qr: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+
+# Feedback Schemas
+class FeedbackBase(BaseModel):
+    rating: int  # 1-5
+    comment: Optional[str] = None
+
+class FeedbackCreate(FeedbackBase):
+    service_request_id: int
+    customer_name: str
+
+class Feedback(FeedbackBase):
+    id: int
+    service_request_id: int
+    customer_name: str
+    is_negative: bool
+    escalated: bool
+    created_at: datetime
     
     class Config:
         from_attributes = True
@@ -221,6 +254,20 @@ class AttendanceCreate(BaseModel):
     longitude: Optional[float] = None
     photo_path: Optional[str] = None
     status: str = "Present"
+
+class Attendance(BaseModel):
+    id: int
+    employee_id: int
+    date: datetime
+    time: str
+    location: str
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    photo_path: Optional[str] = None
+    status: str
+
+    class Config:
+        from_attributes = True
 
 # Follow-up Schemas (Single source - merged from FollowUpHistory + EnquiryNote)
 class FollowUpCreate(BaseModel):

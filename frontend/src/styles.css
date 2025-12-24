@@ -1,7 +1,7 @@
 :root { --brand-primary: #00CCFF; --brand-secondary: #007BA7; --text: #222; --muted: #6b7280; --bg: linear-gradient(135deg, #e0f7ff 0%, #ffffff 100%); }
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; }
-body { margin: 0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color: var(--text); background: linear-gradient(135deg, #ffffff 0%, #ffffff 100%); background-attachment: fixed; }
+body { margin: 0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color: var(--text); background: #ffffff; }
 
 .app { min-height: 100%; display: flex; flex-direction: column; }
 .content { flex: 1; }

@@ -37,31 +37,40 @@ const SalesmanDashboard = () => {
     try {
       const today = new Date().toISOString().split('T')[0];
       
-      const [enquiries, followups, visits, reports, attendance] = await Promise.all([
+      const [enquiries, visits, reports, attendance] = await Promise.all([
         apiRequest(`/api/enquiries?assigned_to=${user.id}`).catch(() => []),
-        apiRequest(`/api/enquiries/followups`).catch(() => []),
         apiRequest(`/api/sales/my-visits`).catch(() => []),
         apiRequest(`/api/reports/my-reports?days=1`).catch(() => []),
         apiRequest(`/api/sales/my-attendance?date=${today}`).catch(() => [])
       ]);
 
       const enquiriesData = enquiries || [];
-      const followupsData = followups || [];
       const visitsData = visits || [];
       const reportsData = reports || [];
       const attendanceData = attendance || [];
+      
+      // Fetch followups for each enquiry
+      let allFollowups = [];
+      for (const enq of enquiriesData) {
+        try {
+          const enqFollowups = await apiRequest(`/api/enquiries/${enq.id}/followups`).catch(() => []);
+          allFollowups = [...allFollowups, ...(enqFollowups || [])];
+        } catch (err) {
+          console.error(`Error fetching followups for enquiry ${enq.id}:`, err);
+        }
+      }
 
       // Today's follow-ups
-      const todayFollowups = followupsData.filter(f => 
+      const todayFollowups = allFollowups.filter(f => 
         f.followup_date?.startsWith(today) && f.status === 'Pending'
       );
 
       // Overdue follow-ups
       const now = new Date();
-      const overdueFollowups = followupsData.filter(f => {
+      const overdueFollowups = allFollowups.filter(f => {
         if (f.status !== 'Pending') return false;
-        const scheduledDate = new Date(f.followup_date);
-        return scheduledDate < now;
+        const followupDate = new Date(f.followup_date);
+        return followupDate < now;
       });
 
       // Calculate performance metrics

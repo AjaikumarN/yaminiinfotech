@@ -39,8 +39,7 @@ export default function EnquiryDetail() {
       // Fetch assigned user details if assigned_to exists
       if (enquiryData.assigned_to) {
         try {
-          const usersData = await apiRequest('/api/users')
-          const user = usersData.find(u => u.id === enquiryData.assigned_to)
+          const user = await apiRequest(`/api/users/${enquiryData.assigned_to}`)
           setAssignedUser(user)
         } catch (err) {
           console.error('Error fetching assigned user:', err)

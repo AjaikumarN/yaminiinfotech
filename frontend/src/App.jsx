@@ -29,6 +29,18 @@ import ServiceEngineerDashboard from './components/ServiceEngineerDashboard.jsx'
 import AdminDashboard from './components/AdminDashboard.jsx'
 import AdminSalesPerformance from './components/AdminSalesPerformance.jsx'
 import AddProduct from './components/AddProduct.jsx'
+import FeedbackPage from './components/FeedbackPage.jsx'
+
+// Reception Menu Pages
+import ReceptionLayout from './components/reception/ReceptionLayout.jsx'
+import EnquiryBoard from './components/reception/EnquiryBoard.jsx'
+import CallsHistory from './components/reception/CallsHistory.jsx'
+import ServiceComplaints from './components/reception/ServiceComplaints.jsx'
+import RepeatComplaints from './components/reception/RepeatComplaints.jsx'
+import DeliveryLog from './components/reception/DeliveryLog.jsx'
+import OutstandingSummary from './components/reception/OutstandingSummary.jsx'
+import MissingReports from './components/reception/MissingReports.jsx'
+import VisitorLog from './components/reception/VisitorLog.jsx'
 
 export default function App() {
   const [showNotificationPanel, setShowNotificationPanel] = useState(false)
@@ -60,6 +72,9 @@ export default function App() {
               <Route path="/products/:id" element={<ProductDetail />} />
               <Route path="/enquiry/:productId" element={<EnquiryForm />} />
               
+              {/* Public Feedback Route - Customer feedback after service completion */}
+              <Route path="/feedback/:id" element={<FeedbackPage />} />
+              
               {/* Protected routes with role-based access */}
               <Route 
                 path="/customer" 
@@ -70,23 +85,26 @@ export default function App() {
                 } 
               />
               
+              {/* Reception Menu Pages - Nested Routes with Sidebar */}
               <Route 
                 path="/reception" 
                 element={
                   <ProtectedRoute allowedRoles={['RECEPTION', 'ADMIN']}>
-                    <ReceptionDashboardNew />
+                    <ReceptionLayout />
                   </ProtectedRoute>
-                } 
-              />
-              
-              <Route 
-                path="/reception/dashboard" 
-                element={
-                  <ProtectedRoute allowedRoles={['RECEPTION', 'ADMIN']}>
-                    <ReceptionDashboardNew />
-                  </ProtectedRoute>
-                } 
-              />
+                }
+              >
+                <Route index element={<ReceptionDashboardNew />} />
+                <Route path="dashboard" element={<ReceptionDashboardNew />} />
+                <Route path="enquiries" element={<EnquiryBoard />} />
+                <Route path="calls" element={<CallsHistory />} />
+                <Route path="service-complaints" element={<ServiceComplaints />} />
+                <Route path="repeat-complaints" element={<RepeatComplaints />} />
+                <Route path="delivery-log" element={<DeliveryLog />} />
+                <Route path="outstanding" element={<OutstandingSummary />} />
+                <Route path="missing-reports" element={<MissingReports />} />
+                <Route path="visitors" element={<VisitorLog />} />
+              </Route>
               
               {/* Enquiry routes - redirect to reception dashboard */}
               <Route 

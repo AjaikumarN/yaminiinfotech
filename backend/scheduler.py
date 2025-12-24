@@ -205,10 +205,10 @@ def check_service_sla():
     try:
         now = datetime.utcnow()
         
-        # Get complaints approaching or past SLA
+        # Get complaints approaching or past SLA (using new status values)
         complaints = db.query(Complaint).filter(
-            Complaint.status.in_(["Assigned", "On the way"]),
-            Complaint.sla_time.isnot(None)
+            Complaint.status.in_(["ASSIGNED", "ON_THE_WAY", "IN_PROGRESS"]),
+            Complaint.sla_due.isnot(None)
         ).all()
         
         # Get admin and office staff for notifications
@@ -216,7 +216,7 @@ def check_service_sla():
         office_staff = db.query(User).filter(User.role == UserRole.OFFICE_STAFF, User.is_active == True).all()
         
         for complaint in complaints:
-            time_remaining = complaint.sla_time - now
+            time_remaining = complaint.sla_due - now
             hours_remaining = time_remaining.total_seconds() / 3600
             
             # SLA BREACH - Already late
@@ -250,7 +250,7 @@ def check_service_sla():
                     )
                 
                 complaint.sla_breach_notified = True
-                complaint.status = "Delayed"
+                # Don't change status - let service engineer manage it
                 logger.error(f"🚨 SLA BREACH: {complaint.ticket_no} - {hours_late:.1f}h late")
             
             # SLA WARNING - 2 hours remaining

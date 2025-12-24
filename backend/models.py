@@ -113,18 +113,44 @@ class Complaint(Base):
     address = Column(Text)
     machine_model = Column(String)
     fault_description = Column(Text)
-    priority = Column(String, default="Normal")
-    status = Column(String, default="Assigned")  # Assigned, On the way, Completed, Delayed
+    priority = Column(String, default="NORMAL")  # NORMAL, URGENT, CRITICAL
+    status = Column(String, default="ASSIGNED")  # ASSIGNED, ON_THE_WAY, IN_PROGRESS, ON_HOLD, COMPLETED
     assigned_to = Column(Integer, ForeignKey("users.id"))
-    sla_time = Column(DateTime)
+    
+    # SLA Fields
+    sla_time = Column(DateTime)  # When SLA expires
     sla_warning_sent = Column(Boolean, default=False)
     sla_breach_notified = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Service completion fields
     completed_at = Column(DateTime)
+    resolution_notes = Column(Text)  # Engineer's resolution notes
+    parts_replaced = Column(Text)  # Parts replaced during service
+    
+    # Feedback fields
+    feedback_url = Column(String)  # Generated feedback URL
+    feedback_qr = Column(Text)  # Base64 encoded QR code
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
     customer = relationship("Customer", back_populates="complaints")
     assigned_engineer = relationship("User", back_populates="complaints")
+
+class Feedback(Base):
+    __tablename__ = "feedback"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    service_request_id = Column(Integer, ForeignKey("complaints.id"))
+    customer_name = Column(String)
+    rating = Column(Integer)  # 1-5 stars
+    comment = Column(Text)
+    is_negative = Column(Boolean, default=False)  # True if rating <= 2
+    escalated = Column(Boolean, default=False)  # Auto-escalate negative feedback
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    service_request = relationship("Complaint")
 
 class Booking(Base):
     __tablename__ = "bookings"

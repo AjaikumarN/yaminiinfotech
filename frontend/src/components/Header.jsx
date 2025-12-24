@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { FiSearch, FiBell, FiShoppingCart, FiMenu, FiX, FiChevronDown, FiChevronUp, FiUser, FiLogOut } from 'react-icons/fi'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { apiRequest } from '../utils/api.js'
@@ -17,6 +17,7 @@ const navItems = [
 export default function Header({ showNotificationPanel, setShowNotificationPanel }) {
   const { isAuthenticated, user, logout } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [menuOpen, setMenuOpen] = useState(false)
   const [employeesOpen, setEmployeesOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
@@ -82,7 +83,14 @@ export default function Header({ showNotificationPanel, setShowNotificationPanel
     />
     <header className="site-header">
       <div className="topbar">
-        <button className="menu-toggle" onClick={toggleMenu} aria-label="Menu">
+        <button className="menu-toggle" onClick={() => {
+          if (location.pathname.startsWith('/reception')) {
+            // Dispatch custom event for reception sidebar
+            window.dispatchEvent(new Event('toggleReceptionMenu'));
+          } else {
+            toggleMenu();
+          }
+        }} aria-label="Menu">
           {menuOpen ? <FiX /> : <FiMenu />}
         </button>
         <div className="logo-wrap">

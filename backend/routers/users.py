@@ -29,13 +29,35 @@ def get_salesmen(
 
 @router.get("/", response_model=List[schemas.User])
 def get_users(
+    role: str = None,
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.require_permission("manage_employees"))
+    current_user: models.User = Depends(auth.get_current_user)
 ):
-    """Get all users (requires manage_employees permission)"""
-    return crud.get_users(db, skip=skip, limit=limit)
+    """Get all users with optional role filter (RECEPTION can view engineers for assignment)"""
+    
+    # Reception can only view SERVICE_ENGINEER for assignment purposes
+    if current_user.role == models.UserRole.RECEPTION:
+        if role and role == "SERVICE_ENGINEER":
+            users = db.query(models.User).filter(
+                models.User.role == models.UserRole.SERVICE_ENGINEER,
+                models.User.is_active == True
+            ).all()
+            return users
+        else:
+            raise HTTPException(status_code=403, detail="Reception can only view service engineers")
+    
+    # Admin can view all users
+    if current_user.role != models.UserRole.ADMIN:
+        raise HTTPException(status_code=403, detail="Only admin can view all users")
+    
+    query = db.query(models.User)
+    
+    if role:
+        query = query.filter(models.User.role == role)
+    
+    return query.offset(skip).limit(limit).all()
 
 @router.post("/", response_model=schemas.User)
 def create_user(
@@ -60,9 +82,9 @@ def create_user(
 def get_user(
     user_id: int,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.require_permission("manage_employees"))
+    current_user: models.User = Depends(auth.get_current_user)
 ):
-    """Get a specific user by ID"""
+    """Get a specific user by ID (salesmen can view to see assigned users)"""
     db_user = db.query(models.User).filter(models.User.id == user_id).first()
     if not db_user:
         raise HTTPException(status_code=404, detail="User not found")

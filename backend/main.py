@@ -11,6 +11,9 @@ from routers import users
 from routers import customers
 from routers import enquiries
 from routers import complaints
+from routers import service_requests
+from routers import feedback
+from routers import attendance
 from routers import mif
 from routers import sales
 from routers import products
@@ -66,6 +69,9 @@ app.include_router(users.router)
 app.include_router(customers.router)
 app.include_router(enquiries.router)
 app.include_router(complaints.router)
+app.include_router(service_requests.router)
+app.include_router(feedback.router)
+app.include_router(attendance.router)
 app.include_router(mif.router)
 app.include_router(sales.router)
 app.include_router(orders.router)
