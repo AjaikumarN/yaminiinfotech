@@ -27,9 +27,9 @@ def get_all_sales(
 def create_sales_call(
     call: schemas.SalesCallCreate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user)
+    current_user: models.User = Depends(auth.require_attendance_today)
 ):
-    """Create a sales call record (Salesman or Reception)"""
+    """Create a sales call record (Salesman or Reception) - Attendance required for salesmen"""
     if current_user.role not in [models.UserRole.SALESMAN, models.UserRole.RECEPTION, models.UserRole.ADMIN]:
         raise HTTPException(status_code=403, detail="Only salesmen or reception can create calls")
     
@@ -42,9 +42,9 @@ def create_sales_call(
 def create_shop_visit(
     visit: schemas.ShopVisitCreate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user)
+    current_user: models.User = Depends(auth.require_attendance_today)
 ):
-    """Create a shop visit record"""
+    """Create a shop visit record - Attendance required"""
     if current_user.role != models.UserRole.SALESMAN:
         raise HTTPException(status_code=403, detail="Only salesmen can create visits")
     
@@ -231,9 +231,9 @@ def get_salesman_enquiries(
     status: str = None,
     priority: str = None,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user)
+    current_user: models.User = Depends(auth.require_attendance_today)
 ):
-    """Get enquiries assigned to current salesman"""
+    """Get enquiries assigned to current salesman - Attendance required"""
     
     if current_user.role != models.UserRole.SALESMAN:
         raise HTTPException(status_code=403, detail="Only salesmen can access this")
@@ -252,9 +252,9 @@ def update_salesman_enquiry(
     enquiry_id: int,
     enquiry_update: schemas.EnquiryUpdate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user)
+    current_user: models.User = Depends(auth.require_attendance_today)
 ):
-    """Update enquiry - Salesman can update their own enquiries"""
+    """Update enquiry - Salesman can update their own enquiries - Attendance required"""
     
     if current_user.role != models.UserRole.SALESMAN:
         raise HTTPException(status_code=403, detail="Only salesmen can update enquiries")
@@ -289,9 +289,9 @@ def update_salesman_enquiry(
 @router.get("/salesman/followups/today")
 def get_today_followups(
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user)
+    current_user: models.User = Depends(auth.require_attendance_today)
 ):
-    """Get today's followups for current salesman"""
+    """Get today's followups for current salesman - Attendance required"""
     
     if current_user.role != models.UserRole.SALESMAN:
         raise HTTPException(status_code=403, detail="Only salesmen can access this")
@@ -310,14 +310,14 @@ def get_today_followups(
 def submit_daily_report(
     report: schemas.DailyReportCreate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user)
+    current_user: models.User = Depends(auth.require_attendance_today)
 ):
-    """Submit daily report - Salesman only"""
+    """Submit daily report - Salesman only - Attendance required (auto-checked in dependency)"""
     
     if current_user.role != models.UserRole.SALESMAN:
         raise HTTPException(status_code=403, detail="Only salesmen can submit daily reports")
     
-    report_date = report.date.date() if isinstance(report.date, datetime) else report.date
+    report_date = report.report_date.date() if isinstance(report.report_date, datetime) else report.report_date
     
     # Check if attendance is marked for today
     attendance = db.query(models.Attendance).filter(
@@ -332,36 +332,29 @@ def submit_daily_report(
         raise HTTPException(status_code=400, detail="Attendance not marked for this date")
     
     # Validation: Calls + Visits must not be 0
-    if report.calls_made + report.visits_made == 0:
+    if report.calls_made + report.shops_visited == 0:
         raise HTTPException(status_code=400, detail="No activity recorded. Either calls or visits must be greater than 0")
     
     # Check for duplicate report
     existing_report = db.query(models.DailyReport).filter(
         models.DailyReport.salesman_id == current_user.id,
-        models.DailyReport.date == report_date
+        models.DailyReport.report_date == report_date
     ).first()
     
     if existing_report:
         raise HTTPException(status_code=400, detail="Duplicate report. Report already submitted for this date")
     
-    # Validation: Revenue must match converted enquiries
-    if report.revenue_generated > 0 and report.enquiries_generated == 0 and report.orders_created == 0:
-        raise HTTPException(status_code=400, detail="Invalid revenue. Revenue requires enquiries or orders")
-    
     # Create report
     db_report = models.DailyReport(
         salesman_id=current_user.id,
-        date=report_date,
+        report_date=report_date,
         calls_made=report.calls_made,
-        visits_made=report.visits_made,
+        shops_visited=report.shops_visited,
         enquiries_generated=report.enquiries_generated,
-        followups_completed=report.followups_completed,
-        orders_created=report.orders_created,
-        revenue_generated=report.revenue_generated,
-        remarks=report.remarks,
-        submitted=True,
-        submitted_at=datetime.utcnow(),
-        attendance_marked=attendance_marked
+        sales_closed=report.sales_closed,
+        report_notes=report.report_notes,
+        report_submitted=True,
+        submission_time=datetime.utcnow()
     )
     
     db.add(db_report)
@@ -385,11 +378,12 @@ def get_daily_report(
     
     report = db.query(models.DailyReport).filter(
         models.DailyReport.salesman_id == current_user.id,
-        models.DailyReport.date == date_obj
+        models.DailyReport.report_date == date_obj
     ).first()
     
     if not report:
-        raise HTTPException(status_code=404, detail="Report not found for this date")
+        # Return null instead of 404 for better UX
+        return None
     
     return report
 

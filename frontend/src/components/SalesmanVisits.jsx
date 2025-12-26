@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../contexts/AuthContext';
 import { apiRequest } from '../utils/api';
+import VoiceInputButton from './VoiceInputButton';
 
 const SalesmanVisits = () => {
   const { user } = useContext(AuthContext);
@@ -22,14 +23,21 @@ const SalesmanVisits = () => {
     notes: ''
   });
   const [loading, setLoading] = useState(true);
+  
+  // ❌ REMOVED ATTENDANCE CHECK - No blocking
 
   useEffect(() => {
+    // Fetch visits when component mounts
     if (user) {
       fetchVisits();
+    } else {
+      setLoading(false);
     }
   }, [user]);
 
   const fetchVisits = async () => {
+    // ❌ REMOVED ATTENDANCE GUARD - No blocking
+
     try {
       const data = await apiRequest('/api/sales/my-visits');
       setVisits(data || []);
@@ -105,9 +113,13 @@ const SalesmanVisits = () => {
     });
   };
 
+  // ❌ REMOVED ATTENDANCE LOADING CHECK - No blocking
+
   if (loading) {
     return <div className="loading">⏳ Loading visits...</div>;
   }
+
+  // ❌ REMOVED ATTENDANCE GATE - No blocking anymore
 
   return (
     <div className="visits-page">
@@ -133,30 +145,51 @@ const SalesmanVisits = () => {
             <div className="form-grid">
               <div className="form-group">
                 <label>Customer Name *</label>
-                <input
-                  type="text"
-                  value={formData.customer_name}
-                  onChange={(e) => setFormData({...formData, customer_name: e.target.value})}
-                  required
-                />
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    value={formData.customer_name}
+                    onChange={(e) => setFormData({...formData, customer_name: e.target.value})}
+                    required
+                    style={{ flex: 1 }}
+                  />
+                  <VoiceInputButton 
+                    fieldContext="customer_name"
+                    onTranscript={(text) => setFormData({...formData, customer_name: text})}
+                  />
+                </div>
               </div>
               
               <div className="form-group">
                 <label>Shop Name</label>
-                <input
-                  type="text"
-                  value={formData.shop_name}
-                  onChange={(e) => setFormData({...formData, shop_name: e.target.value})}
-                />
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    value={formData.shop_name}
+                    onChange={(e) => setFormData({...formData, shop_name: e.target.value})}
+                    style={{ flex: 1 }}
+                  />
+                  <VoiceInputButton 
+                    fieldContext="shop_name"
+                    onTranscript={(text) => setFormData({...formData, shop_name: text})}
+                  />
+                </div>
               </div>
               
               <div className="form-group">
                 <label>Contact Number</label>
-                <input
-                  type="tel"
-                  value={formData.customer_contact}
-                  onChange={(e) => setFormData({...formData, customer_contact: e.target.value})}
-                />
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <input
+                    type="tel"
+                    value={formData.customer_contact}
+                    onChange={(e) => setFormData({...formData, customer_contact: e.target.value})}
+                    style={{ flex: 1 }}
+                  />
+                  <VoiceInputButton 
+                    fieldContext="phone"
+                    onTranscript={(text) => setFormData({...formData, customer_contact: text})}
+                  />
+                </div>
               </div>
               
               <div className="form-group">
@@ -171,20 +204,34 @@ const SalesmanVisits = () => {
               
               <div className="form-group full-width">
                 <label>Shop Address</label>
-                <textarea
-                  value={formData.shop_address}
-                  onChange={(e) => setFormData({...formData, shop_address: e.target.value})}
-                  rows="2"
-                />
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                  <textarea
+                    value={formData.shop_address}
+                    onChange={(e) => setFormData({...formData, shop_address: e.target.value})}
+                    rows="2"
+                    style={{ flex: 1 }}
+                  />
+                  <VoiceInputButton 
+                    fieldContext="address"
+                    onTranscript={(text) => setFormData({...formData, shop_address: text})}
+                  />
+                </div>
               </div>
               
               <div className="form-group">
                 <label>Product Interest</label>
-                <input
-                  type="text"
-                  value={formData.product_interest}
-                  onChange={(e) => setFormData({...formData, product_interest: e.target.value})}
-                />
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    value={formData.product_interest}
+                    onChange={(e) => setFormData({...formData, product_interest: e.target.value})}
+                    style={{ flex: 1 }}
+                  />
+                  <VoiceInputButton 
+                    fieldContext="product_name"
+                    onTranscript={(text) => setFormData({...formData, product_interest: text})}
+                  />
+                </div>
               </div>
               
               <div className="form-group">
@@ -222,22 +269,46 @@ const SalesmanVisits = () => {
               
               <div className="form-group full-width">
                 <label>Requirements *</label>
-                <textarea
-                  value={formData.requirements}
-                  onChange={(e) => setFormData({...formData, requirements: e.target.value})}
-                  rows="3"
-                  required
-                />
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                  <textarea
+                    value={formData.requirements}
+                    onChange={(e) => setFormData({...formData, requirements: e.target.value})}
+                    rows="3"
+                    required
+                    style={{ flex: 1 }}
+                  />
+                  <VoiceInputButton 
+                    fieldContext="remarks"
+                    onTranscript={(text) => {
+                      setFormData(prev => ({
+                        ...prev,
+                        requirements: prev.requirements + (prev.requirements ? ' ' : '') + text
+                      }));
+                    }}
+                  />
+                </div>
               </div>
               
               <div className="form-group full-width">
                 <label>Visit Notes</label>
-                <textarea
-                  value={formData.notes}
-                  onChange={(e) => setFormData({...formData, notes: e.target.value})}
-                  rows="3"
-                  placeholder="Additional notes, observations, or action items..."
-                />
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                  <textarea
+                    value={formData.notes}
+                    onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                    rows="3"
+                    placeholder="Additional notes, observations, or action items..."
+                    style={{ flex: 1 }}
+                  />
+                  <VoiceInputButton 
+                    fieldContext="notes"
+                    onTranscript={(text) => {
+                      setFormData(prev => ({
+                        ...prev,
+                        notes: prev.notes + (prev.notes ? ' ' : '') + text
+                      }));
+                    }}
+                  />
+                </div>
               </div>
             </div>
             

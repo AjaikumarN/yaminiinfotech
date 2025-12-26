@@ -16,17 +16,21 @@ const MissingReports = () => {
 
   const fetchMissingReports = async () => {
     try {
-      const [dailyReports, serviceRequests, users] = await Promise.all([
-        apiRequest('/api/reports/daily').catch(() => []),
+      const [dailyReports, serviceRequests, salesmenData, engineersData] = await Promise.all([
+        // Reception/Admin can view all reports via this endpoint
+        apiRequest('/api/reports/daily/all').catch(() => []),
         apiRequest('/api/service-requests/').catch(() => []),
-        apiRequest('/api/users/').catch(() => [])
+        // Reception is allowed to fetch salesmen
+        apiRequest('/api/users/salesmen/').catch(() => []),
+        // Reception can fetch service engineers with role filter
+        apiRequest('/api/users?role=SERVICE_ENGINEER').catch(() => [])
       ]);
 
       const today = new Date();
       const missing = [];
 
       // Check salesmen for missing daily reports
-      const salesmen = (users || []).filter(u => u.role === 'SALESMAN');
+      const salesmen = salesmenData || [];
       salesmen.forEach(salesman => {
         const todayReport = (dailyReports || []).find(r => 
           r.salesman_id === salesman.id && 
@@ -46,7 +50,7 @@ const MissingReports = () => {
       });
 
       // Check service engineers for missing service updates (ON_THE_WAY but no update in 24h)
-      const engineers = (users || []).filter(u => u.role === 'SERVICE_ENGINEER');
+      const engineers = engineersData || [];
       engineers.forEach(engineer => {
         const assignedServices = (serviceRequests || []).filter(s => 
           s.assigned_to === engineer.id && 

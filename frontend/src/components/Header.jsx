@@ -87,6 +87,9 @@ export default function Header({ showNotificationPanel, setShowNotificationPanel
           if (location.pathname.startsWith('/reception')) {
             // Dispatch custom event for reception sidebar
             window.dispatchEvent(new Event('toggleReceptionMenu'));
+          } else if (location.pathname.startsWith('/service-engineer')) {
+            // Dispatch custom event for service engineer sidebar
+            window.dispatchEvent(new Event('toggleServiceEngineerMenu'));
           } else {
             toggleMenu();
           }
@@ -165,31 +168,36 @@ export default function Header({ showNotificationPanel, setShowNotificationPanel
           </div>
           <nav className="sidebar-nav">
             <ul>
-              {user?.role === 'reception' && (
+              {user?.role === 'RECEPTION' && (
                 <li className="menu-item">
                   <Link to="/reception/dashboard" onClick={closeMenu} className="menu-link">Reception Dashboard</Link>
                 </li>
               )}
               
-              {user?.role === 'salesman' && (
-                <li className="menu-item">
-                  <Link to="/salesman/dashboard" onClick={closeMenu} className="menu-link">Salesman Dashboard</Link>
-                </li>
+              {user?.role === 'SALESMAN' && (
+                <>
+                  <li className="menu-item">
+                    <Link to="/salesman/dashboard" onClick={closeMenu} className="menu-link">Dashboard</Link>
+                  </li>
+                  <li className="menu-item">
+                    <Link to="/salesman/enquiries" onClick={closeMenu} className="menu-link">Enquiries</Link>
+                  </li>
+                  <li className="menu-item">
+                    <Link to="/salesman/calls" onClick={closeMenu} className="menu-link">Calls</Link>
+                  </li>
+                  <li className="menu-item">
+                    <Link to="/salesman/followups" onClick={closeMenu} className="menu-link">Follow-Ups</Link>
+                  </li>
+                </>
               )}
               
-              {user?.role === 'service_engineer' && (
-                <li className="menu-item">
-                  <Link to="/engineer/dashboard" onClick={closeMenu} className="menu-link">Engineer Dashboard</Link>
-                </li>
-              )}
-              
-              {user?.role === 'office_staff' && (
+              {user?.role === 'OFFICE_STAFF' && (
                 <li className="menu-item">
                   <Link to="/office/dashboard" onClick={closeMenu} className="menu-link">Office Staff Dashboard</Link>
                 </li>
               )}
               
-              {user?.role === 'admin' && (
+              {user?.role === 'ADMIN' && (
                 <>
                   <li className="menu-item">
                     <Link to="/admin/dashboard" onClick={closeMenu} className="menu-link">Admin Dashboard</Link>

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from "react";
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../contexts/AuthContext';
 import { apiRequest } from '../utils/api';
+import './ServiceEngineerDashboard.css';
 
 const ServiceEngineerDashboard = () => {
   const { user } = useContext(AuthContext);
@@ -30,12 +31,15 @@ const ServiceEngineerDashboard = () => {
   // Performance Analytics State
   const [analytics, setAnalytics] = useState(null);
 
-  // Status Update Modal
+  // Modals State
   const [statusModal, setStatusModal] = useState({ show: false, service: null });
   const [completionModal, setCompletionModal] = useState({ show: false, service: null });
   const [resolutionNotes, setResolutionNotes] = useState('');
   const [partsReplaced, setPartsReplaced] = useState('');
   const [qrModal, setQrModal] = useState({ show: false, qr: null, url: null });
+
+  // Filter state
+  const [activeFilter, setActiveFilter] = useState('all');
 
   useEffect(() => {
     checkAttendanceStatus();
@@ -45,7 +49,7 @@ const ServiceEngineerDashboard = () => {
     if (attendanceStatus.checked_in) {
       fetchServices();
       fetchAnalytics();
-      const interval = setInterval(fetchServices, 30000); // Refresh every 30 seconds
+      const interval = setInterval(fetchServices, 30000);
       return () => clearInterval(interval);
     }
   }, [attendanceStatus.checked_in]);
@@ -67,7 +71,6 @@ const ServiceEngineerDashboard = () => {
   const handleCheckIn = async () => {
     setCheckingIn(true);
     try {
-      // Get current location
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(async (position) => {
           try {
@@ -85,9 +88,7 @@ const ServiceEngineerDashboard = () => {
               body: JSON.stringify(checkInData)
             });
 
-            // Wait for status to update
             const statusData = await apiRequest('/api/attendance/status');
-            console.log('Attendance status after check-in:', statusData);
             
             if (statusData.checked_in) {
               setAttendanceStatus({
@@ -95,9 +96,6 @@ const ServiceEngineerDashboard = () => {
                 attendance: statusData.attendance,
                 loading: false
               });
-              alert('✅ Successfully checked in! Loading dashboard...');
-            } else {
-              alert('⚠️ Check-in succeeded but status not updated. Please refresh the page.');
             }
             setCheckingIn(false);
           } catch (error) {
@@ -185,7 +183,6 @@ const ServiceEngineerDashboard = () => {
 
       setStatusModal({ show: false, service: null });
       fetchServices();
-      alert(`✅ Status updated to ${newStatus}`);
     } catch (error) {
       alert('❌ Failed to update status: ' + error.message);
     }
@@ -210,7 +207,6 @@ const ServiceEngineerDashboard = () => {
       setResolutionNotes('');
       setPartsReplaced('');
       
-      // Show QR code
       setQrModal({
         show: true,
         qr: response.feedback_qr,
@@ -243,168 +239,98 @@ const ServiceEngineerDashboard = () => {
     return colors[priority] || '#6b7280';
   };
 
+  const filteredServices = services.filter(service => {
+    if (activeFilter === 'all') return service.status !== 'COMPLETED';
+    if (activeFilter === 'critical') return service.priority === 'CRITICAL';
+    if (activeFilter === 'sla-risk') return service.sla_status?.status === 'warning' || service.sla_status?.status === 'breached';
+    return true;
+  });
+
   // Attendance Gate
   if (attendanceStatus.loading) {
     return (
-      <div className="loading-screen">
-        <div className="spinner"></div>
-        <p>Loading...</p>
+      <div className="se-loading-screen">
+        <div className="se-spinner"></div>
+        <p>Loading workspace...</p>
       </div>
     );
   }
 
   if (!attendanceStatus.checked_in) {
     return (
-      <div className="attendance-gate">
-        <div className="gate-card">
-          <div className="gate-icon">🔐</div>
+      <div className="se-attendance-gate">
+        <div className="se-gate-card">
+          <div className="se-gate-icon">🔐</div>
           <h1>Attendance Required</h1>
-          <p>You must check in before accessing service requests</p>
-          <div className="gate-info">
-            <p>📍 Location tracking will be enabled</p>
-            <p>⏰ Time: {new Date().toLocaleString()}</p>
+          <p>Start your workday by checking in</p>
+          <div className="se-gate-info">
+            <div className="se-gate-info-item">
+              <span className="icon">📍</span>
+              <span>Location tracking enabled</span>
+            </div>
+            <div className="se-gate-info-item">
+              <span className="icon">⏰</span>
+              <span>{new Date().toLocaleString()}</span>
+            </div>
           </div>
           <button 
-            className="btn-checkin" 
+            className="se-btn-checkin" 
             onClick={handleCheckIn}
             disabled={checkingIn}
           >
             {checkingIn ? '⏳ Checking In...' : '✅ Check In Now'}
           </button>
         </div>
-
-        <style>{`
-          .attendance-gate {
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 20px;
-          }
-
-          .gate-card {
-            background: white;
-            padding: 50px;
-            border-radius: 20px;
-            text-align: center;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            max-width: 500px;
-            width: 100%;
-          }
-
-          .gate-icon {
-            font-size: 80px;
-            margin-bottom: 20px;
-          }
-
-          .gate-card h1 {
-            margin: 0 0 15px 0;
-            color: #1f2937;
-            font-size: 28px;
-          }
-
-          .gate-card > p {
-            color: #6b7280;
-            margin: 0 0 30px 0;
-            font-size: 16px;
-          }
-
-          .gate-info {
-            background: #f3f4f6;
-            padding: 20px;
-            border-radius: 12px;
-            margin-bottom: 30px;
-          }
-
-          .gate-info p {
-            margin: 8px 0;
-            color: #4b5563;
-            font-size: 14px;
-          }
-
-          .btn-checkin {
-            width: 100%;
-            padding: 16px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            border-radius: 12px;
-            font-size: 18px;
-            font-weight: 700;
-            cursor: pointer;
-            transition: transform 0.2s;
-          }
-
-          .btn-checkin:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
-          }
-
-          .btn-checkin:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-          }
-
-          .loading-screen {
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 20px;
-          }
-
-          .spinner {
-            width: 50px;
-            height: 50px;
-            border: 4px solid #f3f4f6;
-            border-top: 4px solid #667eea;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-          }
-
-          @keyframes spin {
-            to { transform: rotate(360deg); }
-          }
-        `}</style>
       </div>
     );
   }
 
   // Main Dashboard
   return (
-    <div className="engineer-dashboard">
-      {/* Header */}
-      <div className="dashboard-header">
-        <div>
-          <h1>🔧 Service Engineer Dashboard</h1>
-          <p>Welcome, {user?.full_name || user?.name}</p>
-          <span className="attendance-badge">✅ Checked In at {new Date(attendanceStatus.attendance.date).toLocaleTimeString()}</span>
+    <div className="se-dashboard">
+      {/* Header Section */}
+      <div className="se-header">
+        <div className="se-header-left">
+          <div className="se-header-icon">🔧</div>
+          <div className="se-header-text">
+            <h1>Service Engineer</h1>
+            <p>Welcome back, <strong>{user?.full_name || user?.name}</strong></p>
+          </div>
         </div>
-        <button className="btn-refresh" onClick={fetchServices}>
-          🔄 Refresh
-        </button>
+        <div className="se-header-right">
+          <div className="se-attendance-badge">
+            <span className="badge-icon">✅</span>
+            <span>Checked in at {new Date(attendanceStatus.attendance.date).toLocaleTimeString()}</span>
+          </div>
+          <button className="se-btn-refresh" onClick={fetchServices}>
+            <span className="icon">🔄</span>
+            Refresh
+          </button>
+        </div>
       </div>
 
       {/* Performance Analytics */}
       {analytics && (
-        <div className="analytics-card">
-          <h2>📊 Your Performance</h2>
-          <div className="analytics-grid">
-            <div className="metric">
-              <div className="metric-value">{analytics.average_rating?.toFixed(1) || 'N/A'}⭐</div>
+        <div className="se-analytics-card">
+          <h2><span className="icon">📊</span> Your Performance</h2>
+          <div className="se-analytics-grid">
+            <div className="se-metric">
+              <div className="metric-icon">⭐</div>
+              <div className="metric-value">{analytics.average_rating?.toFixed(1) || 'N/A'}</div>
               <div className="metric-label">Avg Rating</div>
             </div>
-            <div className="metric">
+            <div className="se-metric">
+              <div className="metric-icon">📈</div>
               <div className="metric-value">{analytics.sla_compliance_percentage?.toFixed(0) || '0'}%</div>
               <div className="metric-label">SLA Compliance</div>
             </div>
-            <div className="metric">
+            <div className="se-metric">
+              <div className="metric-icon">🎯</div>
               <div className="metric-value">{analytics.performance_score?.toFixed(0) || '0'}</div>
               <div className="metric-label">Performance Score</div>
             </div>
-            <div className="metric">
+            <div className="se-metric">
+              <div className="metric-icon">🛠</div>
               <div className="metric-value">{analytics.total_services || 0}</div>
               <div className="metric-label">Total Services</div>
             </div>
@@ -412,218 +338,270 @@ const ServiceEngineerDashboard = () => {
         </div>
       )}
 
-      {/* Stats Grid */}
-      <div className="stats-grid">
-        <div className="stat-card" style={{ borderLeft: '4px solid #667eea' }}>
+      {/* Quick Stats */}
+      <div className="se-stats-grid">
+        <div className="se-stat-card stat-active">
           <div className="stat-icon">📋</div>
-          <div className="stat-info">
-            <h3>{stats.total}</h3>
-            <p>Active Services</p>
+          <div className="stat-content">
+            <div className="stat-value">{stats.total}</div>
+            <div className="stat-label">Active Jobs</div>
           </div>
         </div>
-
-        <div className="stat-card" style={{ borderLeft: '4px solid #10b981' }}>
+        <div className="se-stat-card stat-completed">
           <div className="stat-icon">✅</div>
-          <div className="stat-info">
-            <h3>{stats.completed_today}</h3>
-            <p>Completed Today</p>
+          <div className="stat-content">
+            <div className="stat-value">{stats.completed_today}</div>
+            <div className="stat-label">Completed Today</div>
           </div>
         </div>
-
-        <div className="stat-card" style={{ borderLeft: '4px solid #f59e0b' }}>
+        <div className="se-stat-card stat-warning">
           <div className="stat-icon">⚠️</div>
-          <div className="stat-info">
-            <h3>{stats.sla_warning}</h3>
-            <p>SLA Warning</p>
+          <div className="stat-content">
+            <div className="stat-value">{stats.sla_warning}</div>
+            <div className="stat-label">SLA Warning</div>
           </div>
         </div>
-
-        <div className="stat-card" style={{ borderLeft: '4px solid #ef4444' }}>
+        <div className="se-stat-card stat-critical">
           <div className="stat-icon">🚨</div>
-          <div className="stat-info">
-            <h3>{stats.sla_breached}</h3>
-            <p>SLA Breached</p>
+          <div className="stat-content">
+            <div className="stat-value">{stats.sla_breached}</div>
+            <div className="stat-label">SLA Breached</div>
           </div>
         </div>
       </div>
 
-      {/* Services List */}
-      <div className="services-panel">
-        <h2>📝 My Service Requests</h2>
+      {/* Filter Tabs */}
+      <div className="se-filter-tabs">
+        <button 
+          className={`se-filter-tab ${activeFilter === 'all' ? 'active' : ''}`}
+          onClick={() => setActiveFilter('all')}
+        >
+          <span className="icon">📋</span>
+          All Jobs ({services.filter(s => s.status !== 'COMPLETED').length})
+        </button>
+        <button 
+          className={`se-filter-tab ${activeFilter === 'critical' ? 'active' : ''}`}
+          onClick={() => setActiveFilter('critical')}
+        >
+          <span className="icon">🔥</span>
+          Critical ({services.filter(s => s.priority === 'CRITICAL').length})
+        </button>
+        <button 
+          className={`se-filter-tab ${activeFilter === 'sla-risk' ? 'active' : ''}`}
+          onClick={() => setActiveFilter('sla-risk')}
+        >
+          <span className="icon">⏱</span>
+          SLA Risk ({services.filter(s => s.sla_status?.status === 'warning' || s.sla_status?.status === 'breached').length})
+        </button>
+      </div>
+
+      {/* Service Jobs List */}
+      <div className="se-jobs-section">
+        <div className="se-section-header">
+          <h2><span className="icon">🛠</span> My Service Jobs</h2>
+        </div>
         
         {loading ? (
-          <div className="loading">⏳ Loading services...</div>
-        ) : services.length === 0 ? (
-          <div className="empty-state">
+          <div className="se-loading">
+            <div className="se-spinner"></div>
+            <p>Loading jobs...</p>
+          </div>
+        ) : filteredServices.length === 0 ? (
+          <div className="se-empty-state">
             <div className="empty-icon">🎉</div>
-            <p>No active service requests</p>
+            <h3>No Jobs Found</h3>
+            <p>You're all caught up! Check back later for new assignments.</p>
           </div>
         ) : (
-          <div className="services-list">
-            {services.map(service => (
-              <div key={service.id} className="service-card">
-                <div className="card-header">
-                  <div className="service-id">
-                    <h3>SR#{service.id}</h3>
-                    <span 
-                      className="priority-badge"
-                      style={{ background: getPriorityColor(service.priority) }}
-                    >
-                      {service.priority || 'NORMAL'}
-                    </span>
-                  </div>
-                  
-                  {/* SLA Timer */}
-                  {service.sla_status && (
-                    <div 
-                      className="sla-timer"
-                      style={{ borderColor: getSLAColor(service.sla_status.status) }}
-                    >
-                      <div className="timer-label">
-                        {service.sla_status.status === 'breached' && '🚨 BREACHED'}
-                        {service.sla_status.status === 'warning' && '⚠️ WARNING'}
-                        {service.sla_status.status === 'ok' && '✅ ON TRACK'}
-                        {service.sla_status.status === 'paused' && '⏸️ PAUSED'}
+          <div className="se-jobs-grid">
+            {filteredServices.map(service => {
+              const slaStatus = service.sla_status?.status || 'ok';
+              const slaRemaining = service.sla_status?.remaining_seconds || 0;
+              
+              return (
+                <div key={service.id} className={`se-job-card priority-${service.priority?.toLowerCase()}`}>
+                  {/* Card Header */}
+                  <div className="job-card-header">
+                    <div className="job-card-title">
+                      <h3>#{service.id}</h3>
+                      <span className={`priority-badge priority-${service.priority?.toLowerCase()}`}>
+                        {service.priority || 'NORMAL'}
+                      </span>
+                    </div>
+                    <div className={`sla-badge sla-${slaStatus}`}>
+                      <div className="sla-label">
+                        {slaStatus === 'breached' && '🚨 BREACHED'}
+                        {slaStatus === 'warning' && '⚠️ WARNING'}
+                        {slaStatus === 'ok' && '✅ ON TRACK'}
+                        {slaStatus === 'paused' && '⏸️ PAUSED'}
                       </div>
-                      <div className="timer-value" style={{ color: getSLAColor(service.sla_status.status) }}>
-                        {service.sla_status.status === 'breached' 
-                          ? `+${formatTime(service.sla_status.remaining_seconds)}`
-                          : formatTime(service.sla_status.remaining_seconds)
+                      <div className="sla-time">
+                        {slaStatus === 'breached' 
+                          ? `+${formatTime(slaRemaining)}`
+                          : formatTime(slaRemaining)
                         }
                       </div>
                     </div>
-                  )}
-                </div>
-
-                <div className="card-body">
-                  <div className="customer-info">
-                    <p><strong>Customer:</strong> {service.customer_name}</p>
-                    <p><strong>Phone:</strong> {service.customer_phone}</p>
-                    <p><strong>Address:</strong> {service.address || 'N/A'}</p>
                   </div>
 
-                  <div className="issue-info">
-                    <p><strong>Issue:</strong></p>
-                    <p className="description">{service.complaint_text}</p>
-                  </div>
-
-                  {service.product && (
-                    <div className="product-info">
-                      🖨️ {service.product.name} - {service.product.model}
+                  {/* Card Body */}
+                  <div className="job-card-body">
+                    <div className="job-info">
+                      <div className="info-row">
+                        <span className="icon">👤</span>
+                        <span className="label">Customer:</span>
+                        <span className="value">{service.customer_name}</span>
+                      </div>
+                      <div className="info-row">
+                        <span className="icon">📞</span>
+                        <span className="label">Phone:</span>
+                        <span className="value">{service.customer_phone || service.phone || 'N/A'}</span>
+                      </div>
+                      <div className="info-row">
+                        <span className="icon">📍</span>
+                        <span className="label">Address:</span>
+                        <span className="value">{service.address || 'N/A'}</span>
+                      </div>
                     </div>
-                  )}
 
-                  <div className="status-badge-row">
-                    <span className={`status-badge status-${service.status?.toLowerCase()}`}>
-                      {service.status?.replace('_', ' ')}
-                    </span>
-                    <span className="created-at">
-                      Created: {new Date(service.created_at).toLocaleString()}
-                    </span>
+                    <div className="job-issue">
+                      <div className="issue-label">
+                        <span className="icon">🔧</span>
+                        <span>Issue Description</span>
+                      </div>
+                      <p className="issue-text">{service.fault_description || service.complaint_text}</p>
+                    </div>
+
+                    {service.product && (
+                      <div className="job-product">
+                        <span className="icon">🖨️</span>
+                        {service.product.name} - {service.product.model}
+                      </div>
+                    )}
+
+                    <div className="job-meta">
+                      <span className={`status-badge status-${service.status?.toLowerCase()}`}>
+                        {service.status?.replace('_', ' ')}
+                      </span>
+                      <span className="created-time">
+                        <span className="icon">🕐</span>
+                        {new Date(service.created_at).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Card Actions */}
+                  <div className="job-card-actions">
+                    {service.status === 'COMPLETED' ? (
+                      <button className="se-btn se-btn-disabled">
+                        <span className="icon">✅</span>
+                        Completed
+                      </button>
+                    ) : (
+                      <>
+                        <button 
+                          className="se-btn se-btn-secondary"
+                          onClick={() => setStatusModal({ show: true, service })}
+                        >
+                          <span className="icon">🔄</span>
+                          Update Status
+                        </button>
+                        
+                        {(service.status === 'IN_PROGRESS' || service.status === 'ON_THE_WAY') && (
+                          <button 
+                            className="se-btn se-btn-primary"
+                            onClick={() => setCompletionModal({ show: true, service })}
+                          >
+                            <span className="icon">✅</span>
+                            Complete Job
+                          </button>
+                        )}
+                      </>
+                    )}
                   </div>
                 </div>
-
-                <div className="card-actions">
-                  {service.status === 'COMPLETED' ? (
-                    <button className="btn-action" disabled style={{ opacity: 0.5 }}>
-                      ✅ Completed
-                    </button>
-                  ) : (
-                    <>
-                      <button 
-                        className="btn-action btn-primary"
-                        onClick={() => setStatusModal({ show: true, service })}
-                      >
-                        🔄 Update Status
-                      </button>
-                      
-                      {(service.status === 'IN_PROGRESS' || service.status === 'ON_THE_WAY') && (
-                        <button 
-                          className="btn-action btn-success"
-                          onClick={() => setCompletionModal({ show: true, service })}
-                        >
-                          ✅ Complete Service
-                        </button>
-                      )}
-                    </>
-                  )}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
 
       {/* Status Update Modal */}
       {statusModal.show && (
-        <div className="modal-overlay" onClick={() => setStatusModal({ show: false, service: null })}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <h2>Update Status - SR#{statusModal.service.id}</h2>
-            <p className="modal-subtitle">Current: {statusModal.service.status}</p>
-            
-            <div className="status-options">
-              {getNextStatus(statusModal.service.status).map(status => (
-                <button
-                  key={status}
-                  className="status-option"
-                  onClick={() => handleStatusUpdate(status)}
-                >
-                  {status.replace('_', ' ')}
-                </button>
-              ))}
+        <div className="se-modal-overlay" onClick={() => setStatusModal({ show: false, service: null })}>
+          <div className="se-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Update Job Status</h2>
+              <button className="modal-close" onClick={() => setStatusModal({ show: false, service: null })}>×</button>
             </div>
-
-            <button 
-              className="btn-cancel"
-              onClick={() => setStatusModal({ show: false, service: null })}
-            >
-              Cancel
-            </button>
+            <div className="modal-body">
+              <p className="modal-subtitle">Job #{statusModal.service.id} - Current: <strong>{statusModal.service.status}</strong></p>
+              
+              <div className="status-options">
+                {getNextStatus(statusModal.service.status).map(status => (
+                  <button
+                    key={status}
+                    className="status-option"
+                    onClick={() => handleStatusUpdate(status)}
+                  >
+                    <span className="icon">➜</span>
+                    {status.replace('_', ' ')}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       )}
 
       {/* Completion Modal */}
       {completionModal.show && (
-        <div className="modal-overlay" onClick={() => setCompletionModal({ show: false, service: null })}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <h2>Complete Service - SR#{completionModal.service.id}</h2>
-            
-            <div className="form-group">
-              <label>Resolution Notes *</label>
-              <textarea
-                value={resolutionNotes}
-                onChange={e => setResolutionNotes(e.target.value)}
-                placeholder="Describe the resolution (required)"
-                rows={4}
-                required
-              />
+        <div className="se-modal-overlay" onClick={() => setCompletionModal({ show: false, service: null })}>
+          <div className="se-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Complete Service Job</h2>
+              <button className="modal-close" onClick={() => setCompletionModal({ show: false, service: null })}>×</button>
             </div>
+            <div className="modal-body">
+              <p className="modal-subtitle">Job #{completionModal.service.id}</p>
+              
+              <div className="form-group">
+                <label>Resolution Notes *</label>
+                <textarea
+                  value={resolutionNotes}
+                  onChange={e => setResolutionNotes(e.target.value)}
+                  placeholder="Describe what was done to resolve the issue..."
+                  rows={5}
+                  required
+                />
+              </div>
 
-            <div className="form-group">
-              <label>Parts Replaced (Optional)</label>
-              <input
-                type="text"
-                value={partsReplaced}
-                onChange={e => setPartsReplaced(e.target.value)}
-                placeholder="e.g., Drum unit, Toner cartridge"
-              />
-            </div>
+              <div className="form-group">
+                <label>Parts Replaced (Optional)</label>
+                <input
+                  type="text"
+                  value={partsReplaced}
+                  onChange={e => setPartsReplaced(e.target.value)}
+                  placeholder="e.g., Drum unit, Toner cartridge"
+                />
+              </div>
 
-            <div className="modal-actions">
-              <button className="btn-action btn-success" onClick={handleComplete}>
-                ✅ Complete & Generate Feedback QR
-              </button>
-              <button 
-                className="btn-cancel"
-                onClick={() => {
-                  setCompletionModal({ show: false, service: null });
-                  setResolutionNotes('');
-                  setPartsReplaced('');
-                }}
-              >
-                Cancel
-              </button>
+              <div className="modal-actions">
+                <button className="se-btn se-btn-primary" onClick={handleComplete}>
+                  <span className="icon">✅</span>
+                  Complete & Generate QR
+                </button>
+                <button 
+                  className="se-btn se-btn-secondary"
+                  onClick={() => {
+                    setCompletionModal({ show: false, service: null });
+                    setResolutionNotes('');
+                    setPartsReplaced('');
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -631,517 +609,38 @@ const ServiceEngineerDashboard = () => {
 
       {/* QR Code Modal */}
       {qrModal.show && (
-        <div className="modal-overlay" onClick={() => setQrModal({ show: false, qr: null, url: null })}>
-          <div className="modal-content qr-modal" onClick={e => e.stopPropagation()}>
-            <h2>✅ Service Completed!</h2>
-            <p className="modal-subtitle">Show this QR code to the customer for feedback</p>
-            
-            {qrModal.qr && (
-              <div className="qr-container">
-                <img src={`data:image/png;base64,${qrModal.qr}`} alt="Feedback QR Code" />
+        <div className="se-modal-overlay" onClick={() => setQrModal({ show: false, qr: null, url: null })}>
+          <div className="se-modal se-qr-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>✅ Service Completed!</h2>
+              <button className="modal-close" onClick={() => setQrModal({ show: false, qr: null, url: null })}>×</button>
+            </div>
+            <div className="modal-body">
+              <p className="modal-subtitle">Show this QR code to customer for feedback</p>
+              
+              {qrModal.qr && (
+                <div className="qr-container">
+                  <img src={`data:image/png;base64,${qrModal.qr}`} alt="Feedback QR Code" />
+                </div>
+              )}
+
+              <div className="feedback-url">
+                <strong>Feedback Link:</strong>
+                <a href={qrModal.url} target="_blank" rel="noopener noreferrer">
+                  {qrModal.url}
+                </a>
               </div>
-            )}
 
-            <p className="feedback-url">
-              <strong>Feedback Link:</strong><br/>
-              <a href={qrModal.url} target="_blank" rel="noopener noreferrer">
-                {qrModal.url}
-              </a>
-            </p>
-
-            <button 
-              className="btn-action btn-primary"
-              onClick={() => setQrModal({ show: false, qr: null, url: null })}
-            >
-              Close
-            </button>
+              <button 
+                className="se-btn se-btn-primary"
+                onClick={() => setQrModal({ show: false, qr: null, url: null })}
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
-
-      <style>{`
-        .engineer-dashboard {
-          padding: 20px;
-          background: #f9fafb;
-          min-height: 100vh;
-        }
-
-        .dashboard-header {
-          background: white;
-          padding: 25px;
-          border-radius: 12px;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-          margin-bottom: 20px;
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-start;
-        }
-
-        .dashboard-header h1 {
-          margin: 0 0 8px 0;
-          color: #111827;
-          font-size: 28px;
-        }
-
-        .dashboard-header p {
-          margin: 0 0 8px 0;
-          color: #6b7280;
-        }
-
-        .attendance-badge {
-          display: inline-block;
-          background: #d1fae5;
-          color: #065f46;
-          padding: 6px 12px;
-          border-radius: 6px;
-          font-size: 13px;
-          font-weight: 600;
-        }
-
-        .btn-refresh {
-          padding: 12px 24px;
-          background: #667eea;
-          color: white;
-          border: none;
-          border-radius: 8px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-
-        .btn-refresh:hover {
-          background: #5568d3;
-          transform: translateY(-1px);
-        }
-
-        .analytics-card {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          color: white;
-          padding: 25px;
-          border-radius: 12px;
-          margin-bottom: 20px;
-          box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-        }
-
-        .analytics-card h2 {
-          margin: 0 0 20px 0;
-          font-size: 20px;
-        }
-
-        .analytics-grid {
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 20px;
-        }
-
-        .metric {
-          background: rgba(255,255,255,0.2);
-          padding: 20px;
-          border-radius: 8px;
-          text-align: center;
-        }
-
-        .metric-value {
-          font-size: 32px;
-          font-weight: 700;
-          margin-bottom: 8px;
-        }
-
-        .metric-label {
-          font-size: 13px;
-          opacity: 0.9;
-        }
-
-        .stats-grid {
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 20px;
-          margin-bottom: 20px;
-        }
-
-        .stat-card {
-          background: white;
-          padding: 20px;
-          border-radius: 12px;
-          display: flex;
-          align-items: center;
-          gap: 15px;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-
-        .stat-icon {
-          font-size: 36px;
-        }
-
-        .stat-info h3 {
-          margin: 0;
-          font-size: 32px;
-          color: #111827;
-        }
-
-        .stat-info p {
-          margin: 4px 0 0 0;
-          color: #6b7280;
-          font-size: 14px;
-        }
-
-        .services-panel {
-          background: white;
-          padding: 25px;
-          border-radius: 12px;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-
-        .services-panel h2 {
-          margin: 0 0 20px 0;
-          color: #111827;
-        }
-
-        .services-list {
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-        }
-
-        .service-card {
-          background: #f9fafb;
-          border: 2px solid #e5e7eb;
-          border-radius: 8px;
-          padding: 20px;
-          transition: all 0.2s;
-        }
-
-        .service-card:hover {
-          border-color: #667eea;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        }
-
-        .card-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-start;
-          margin-bottom: 16px;
-          padding-bottom: 16px;
-          border-bottom: 2px solid #e5e7eb;
-        }
-
-        .service-id {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-        }
-
-        .service-id h3 {
-          margin: 0;
-          color: #111827;
-          font-size: 20px;
-        }
-
-        .priority-badge {
-          padding: 6px 12px;
-          border-radius: 6px;
-          color: white;
-          font-size: 12px;
-          font-weight: 700;
-          text-transform: uppercase;
-        }
-
-        .sla-timer {
-          background: white;
-          padding: 12px 16px;
-          border-radius: 8px;
-          border: 3px solid;
-          text-align: center;
-          min-width: 140px;
-        }
-
-        .timer-label {
-          font-size: 12px;
-          font-weight: 700;
-          margin-bottom: 4px;
-        }
-
-        .timer-value {
-          font-size: 20px;
-          font-weight: 700;
-        }
-
-        .card-body {
-          margin-bottom: 16px;
-        }
-
-        .customer-info,
-        .issue-info {
-          margin-bottom: 12px;
-        }
-
-        .customer-info p,
-        .issue-info p {
-          margin: 4px 0;
-          color: #374151;
-          font-size: 14px;
-        }
-
-        .description {
-          color: #6b7280;
-          line-height: 1.6;
-          padding: 8px 12px;
-          background: white;
-          border-radius: 6px;
-          margin-top: 4px !important;
-        }
-
-        .product-info {
-          background: #e0e7ff;
-          color: #3730a3;
-          padding: 10px 14px;
-          border-radius: 6px;
-          font-size: 13px;
-          font-weight: 600;
-          margin-bottom: 12px;
-        }
-
-        .status-badge-row {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-top: 12px;
-        }
-
-        .status-badge {
-          padding: 6px 14px;
-          border-radius: 6px;
-          font-size: 12px;
-          font-weight: 700;
-          text-transform: uppercase;
-        }
-
-        .status-assigned { background: #dbeafe; color: #1e40af; }
-        .status-on_the_way { background: #fef3c7; color: #92400e; }
-        .status-in_progress { background: #ddd6fe; color: #5b21b6; }
-        .status-on_hold { background: #fed7aa; color: #9a3412; }
-        .status-completed { background: #d1fae5; color: #065f46; }
-
-        .created-at {
-          font-size: 12px;
-          color: #9ca3af;
-        }
-
-        .card-actions {
-          display: flex;
-          gap: 10px;
-          padding-top: 16px;
-          border-top: 2px solid #e5e7eb;
-        }
-
-        .btn-action {
-          flex: 1;
-          padding: 12px;
-          border: none;
-          border-radius: 8px;
-          font-weight: 600;
-          font-size: 14px;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-
-        .btn-primary {
-          background: #667eea;
-          color: white;
-        }
-
-        .btn-primary:hover {
-          background: #5568d3;
-          transform: translateY(-1px);
-        }
-
-        .btn-success {
-          background: #10b981;
-          color: white;
-        }
-
-        .btn-success:hover {
-          background: #059669;
-          transform: translateY(-1px);
-        }
-
-        .modal-overlay {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: rgba(0,0,0,0.7);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 1000;
-          padding: 20px;
-        }
-
-        .modal-content {
-          background: white;
-          padding: 30px;
-          border-radius: 16px;
-          max-width: 500px;
-          width: 100%;
-          max-height: 90vh;
-          overflow-y: auto;
-        }
-
-        .modal-content h2 {
-          margin: 0 0 8px 0;
-          color: #111827;
-        }
-
-        .modal-subtitle {
-          margin: 0 0 20px 0;
-          color: #6b7280;
-          font-size: 14px;
-        }
-
-        .status-options {
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-          margin-bottom: 20px;
-        }
-
-        .status-option {
-          padding: 16px;
-          background: #f3f4f6;
-          border: 2px solid #e5e7eb;
-          border-radius: 8px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.2s;
-          text-transform: uppercase;
-        }
-
-        .status-option:hover {
-          background: #667eea;
-          color: white;
-          border-color: #667eea;
-        }
-
-        .form-group {
-          margin-bottom: 20px;
-        }
-
-        .form-group label {
-          display: block;
-          margin-bottom: 8px;
-          color: #374151;
-          font-weight: 600;
-          font-size: 14px;
-        }
-
-        .form-group textarea,
-        .form-group input {
-          width: 100%;
-          padding: 12px;
-          border: 2px solid #e5e7eb;
-          border-radius: 8px;
-          font-size: 14px;
-          font-family: inherit;
-          resize: vertical;
-        }
-
-        .form-group textarea:focus,
-        .form-group input:focus {
-          outline: none;
-          border-color: #667eea;
-        }
-
-        .modal-actions {
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-        }
-
-        .btn-cancel {
-          padding: 12px;
-          background: #f3f4f6;
-          color: #374151;
-          border: none;
-          border-radius: 8px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-
-        .btn-cancel:hover {
-          background: #e5e7eb;
-        }
-
-        .qr-modal {
-          text-align: center;
-        }
-
-        .qr-container {
-          background: white;
-          padding: 20px;
-          border-radius: 12px;
-          display: inline-block;
-          margin: 20px 0;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        }
-
-        .qr-container img {
-          display: block;
-          width: 250px;
-          height: 250px;
-        }
-
-        .feedback-url {
-          background: #f3f4f6;
-          padding: 15px;
-          border-radius: 8px;
-          margin: 20px 0;
-          font-size: 13px;
-          word-break: break-all;
-        }
-
-        .feedback-url a {
-          color: #667eea;
-          text-decoration: none;
-        }
-
-        .empty-state,
-        .loading {
-          text-align: center;
-          padding: 60px 20px;
-          color: #9ca3af;
-        }
-
-        .empty-icon {
-          font-size: 64px;
-          margin-bottom: 16px;
-        }
-
-        @media (max-width: 1200px) {
-          .analytics-grid,
-          .stats-grid {
-            grid-template-columns: repeat(2, 1fr);
-          }
-        }
-
-        @media (max-width: 768px) {
-          .analytics-grid,
-          .stats-grid {
-            grid-template-columns: 1fr;
-          }
-
-          .card-header {
-            flex-direction: column;
-            gap: 12px;
-          }
-
-          .card-actions {
-            flex-direction: column;
-          }
-        }
-      `}</style>
     </div>
   );
 };

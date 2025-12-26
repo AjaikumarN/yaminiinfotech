@@ -16,13 +16,20 @@ const getAuthToken = () => {
 export const apiRequest = async (endpoint, options = {}) => {
   const token = getAuthToken();
   
+  // Don't set Content-Type for FormData - browser will set it automatically with boundary
+  const headers = {
+    ...(token && { Authorization: `Bearer ${token}` }),
+    ...options.headers,
+  };
+  
+  // Only add Content-Type for non-FormData requests
+  if (!options.isFormData) {
+    headers['Content-Type'] = 'application/json';
+  }
+  
   const config = {
     ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` }),
-      ...options.headers,
-    },
+    headers,
   };
 
   try {

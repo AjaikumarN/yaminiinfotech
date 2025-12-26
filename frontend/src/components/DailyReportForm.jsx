@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import axios from 'axios';
+import VoiceInputButton from './VoiceInputButton';
 
 const DailyReportForm = () => {
   const [formData, setFormData] = useState({
@@ -157,14 +158,25 @@ const DailyReportForm = () => {
             <label htmlFor="report_notes">
               📝 Notes / Highlights
             </label>
-            <textarea
-              id="report_notes"
-              name="report_notes"
-              value={formData.report_notes}
-              onChange={handleChange}
-              rows="4"
-              placeholder="Describe key activities, challenges, or achievements..."
-            />
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+              <textarea
+                id="report_notes"
+                name="report_notes"
+                value={formData.report_notes}
+                onChange={handleChange}
+                rows="4"
+                placeholder="Describe key activities, challenges, or achievements..."
+                style={{ flex: 1 }}
+              />
+              <VoiceInputButton 
+                onTranscript={(text) => {
+                  setFormData(prev => ({
+                    ...prev,
+                    report_notes: prev.report_notes + (prev.report_notes ? ' ' : '') + text
+                  }));
+                }}
+              />
+            </div>
           </div>
 
           <button 

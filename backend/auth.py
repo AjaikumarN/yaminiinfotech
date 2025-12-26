@@ -98,6 +98,70 @@ async def get_current_user_optional(
     user = db.query(models.User).filter(models.User.username == username).first()
     return user
 
+# 🔒 SALESPERSON DISCIPLINE ENFORCEMENT
+
+async def require_attendance_today(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Enforce attendance check for salesmen.
+    Blocks all work-related actions if attendance not marked today.
+    Marks attendance as LATE if checked in after 9:30 AM.
+    """
+    if current_user.role != models.UserRole.SALESMAN:
+        # Only enforce for salesmen
+        return current_user
+    
+    from datetime import date, time
+    today = date.today()
+    
+    # Check if attendance exists for today
+    attendance = db.query(models.Attendance).filter(
+        models.Attendance.employee_id == current_user.id,
+        models.Attendance.date >= datetime.combine(today, datetime.min.time()),
+        models.Attendance.date < datetime.combine(today, datetime.max.time())
+    ).first()
+    
+    if not attendance:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="⏰ Attendance not marked – work access blocked. Please mark attendance first."
+        )
+    
+    # Store attendance in current_user for access in routes
+    current_user.today_attendance = attendance
+    
+    return current_user
+
+def check_late_attendance(check_in_time: datetime) -> str:
+    """
+    Check if attendance is late (after 9:30 AM)
+    Returns: 'ON_TIME', 'LATE'
+    """
+    from datetime import time
+    late_threshold = time(9, 30)  # 9:30 AM
+    
+    check_in_time_only = check_in_time.time()
+    
+    if check_in_time_only > late_threshold:
+        return 'LATE'
+    return 'ON_TIME'
+
+def block_salesman_actions(action_name: str):
+    """
+    Decorator/dependency to block specific actions for salesmen.
+    Used for: create_invoice, approve_order, update_stock, view_mif
+    """
+    def dependency(current_user: models.User = Depends(get_current_user)):
+        if current_user.role == models.UserRole.SALESMAN:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"🚫 Salesmen cannot {action_name}"
+            )
+        return current_user
+    return dependency
+
 def check_permission(user: models.User, permission: str) -> bool:
     """Check if user has specific permission - DEPRECATED, use check_resource_permission"""
     

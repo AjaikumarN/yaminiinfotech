@@ -56,8 +56,8 @@ const ReceptionNav = ({ isOpen, onClose }) => {
 
         .reception-nav {
           width: 280px;
-          background: #2c3e50;
-          color: white;
+          background: #ffffff;
+          color: #1e293b;
           min-height: calc(100vh - 70px);
           position: fixed;
           left: -280px;
@@ -65,6 +65,8 @@ const ReceptionNav = ({ isOpen, onClose }) => {
           overflow-y: auto;
           z-index: 1000;
           transition: left 0.3s ease;
+          border-right: 1px solid #e2e8f0;
+          box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
         }
 
         .reception-nav.open {
@@ -73,20 +75,21 @@ const ReceptionNav = ({ isOpen, onClose }) => {
 
         .nav-header {
           padding: 25px 20px;
-          border-bottom: 2px solid rgba(255,255,255,0.1);
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          border-bottom: 1px solid #e2e8f0;
+          background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
         }
 
         .nav-header h2 {
           margin: 0 0 10px 0;
           font-size: 20px;
           font-weight: 700;
+          color: #ffffff;
         }
 
         .user-name {
           margin: 0;
           font-size: 13px;
-          opacity: 0.9;
+          color: rgba(255, 255, 255, 0.9);
         }
 
         .nav-menu {
@@ -98,22 +101,22 @@ const ReceptionNav = ({ isOpen, onClose }) => {
           align-items: center;
           gap: 15px;
           padding: 15px 20px;
-          color: rgba(255,255,255,0.8);
+          color: #475569;
           text-decoration: none;
           transition: all 0.3s;
           border-left: 4px solid transparent;
         }
 
         .nav-item:hover {
-          background: rgba(255,255,255,0.1);
-          color: white;
-          border-left-color: #3498db;
+          background: #f1f5f9;
+          color: #1e293b;
+          border-left-color: #3b82f6;
         }
 
         .nav-item.active {
-          background: rgba(52, 152, 219, 0.2);
-          color: white;
-          border-left-color: #3498db;
+          background: #eff6ff;
+          color: #1e40af;
+          border-left-color: #3b82f6;
           font-weight: 600;
         }
 
@@ -130,12 +133,21 @@ const ReceptionNav = ({ isOpen, onClose }) => {
         .nav-label {
           font-size: 14px;
           font-weight: 500;
+          color: #1e293b;
+        }
+
+        .nav-item.active .nav-label {
+          color: #1e40af;
         }
 
         .nav-subtitle {
           font-size: 11px;
-          opacity: 0.7;
+          color: #64748b;
           margin-top: 2px;
+        }
+
+        .nav-item.active .nav-subtitle {
+          color: #3b82f6;
         }
       `}</style>
       </div>

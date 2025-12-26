@@ -25,9 +25,9 @@ def generate_invoice_number(db: Session) -> str:
 def create_order(
     order: schemas.OrderCreate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user)
+    current_user: models.User = Depends(auth.require_attendance_today)
 ):
-    """Create order - Salesman only (from CONVERTED enquiry)"""
+    """Create order - Salesman only (from CONVERTED enquiry) - Attendance required"""
     
     # Only salesman and admin can create orders
     if current_user.role not in [models.UserRole.SALESMAN, models.UserRole.ADMIN]:
@@ -38,9 +38,9 @@ def create_order(
     if not enquiry:
         raise HTTPException(status_code=404, detail="Enquiry not found")
     
-    # Validation 1: Enquiry must be CONVERTED
+    # 🔒 CRITICAL: Enquiry must be CONVERTED
     if enquiry.status != "CONVERTED":
-        raise HTTPException(status_code=400, detail="Order allowed only after conversion. Enquiry status must be CONVERTED")
+        raise HTTPException(status_code=400, detail="🚫 Order creation blocked: Enquiry must be CONVERTED first. Current status: " + enquiry.status)
     
     # Validation 2: Must be assigned to current salesman (unless admin)
     if current_user.role == models.UserRole.SALESMAN and enquiry.assigned_to != current_user.id:

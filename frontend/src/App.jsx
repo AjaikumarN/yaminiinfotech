@@ -19,13 +19,25 @@ import ProductDetail from './components/ProductDetail.jsx'
 import EnquiryForm from './components/EnquiryForm.jsx'
 import EnquiryDetail from './components/EnquiryDetail.jsx'
 import ReceptionDashboardNew from './components/ReceptionDashboardNew.jsx'
-import SalesmanDashboard from './components/SalesmanDashboard.jsx'
-import SalesmanEnquiries from './components/SalesmanEnquiries.jsx'
-import SalesmanFollowUps from './components/SalesmanFollowUps.jsx'
-import SalesmanVisits from './components/SalesmanVisits.jsx'
-import SalesmanDailyReport from './components/SalesmanDailyReport.jsx'
-import SalesmanAttendance from './components/SalesmanAttendance.jsx'
-import ServiceEngineerDashboard from './components/ServiceEngineerDashboard.jsx'
+
+// NEW Salesman Module - Clean Architecture (Rebuilt from scratch)
+import SalesmanLayout from './salesman/layout/SalesmanLayout.jsx'
+import SalesmanAttendance from './salesman/pages/Attendance.jsx'
+import SalesmanDashboard from './salesman/pages/Dashboard.jsx'
+import SalesmanEnquiries from './salesman/pages/Enquiries.jsx'
+import SalesmanCalls from './salesman/pages/Calls.jsx'
+import SalesmanFollowUps from './salesman/pages/FollowUps.jsx'
+import SalesmanOrders from './salesman/pages/Orders.jsx'
+import SalesmanDailyReport from './salesman/pages/DailyReport.jsx'
+import SalesmanCompliance from './salesman/pages/Compliance.jsx'
+import ServiceEngineerLayout from './components/service-engineer/ServiceEngineerLayout.jsx'
+import EngineerDashboard from './components/service-engineer/EngineerDashboard.jsx'
+import DailyStart from './components/service-engineer/DailyStart.jsx'
+import AssignedJobs from './components/service-engineer/AssignedJobs.jsx'
+import ServiceHistory from './components/service-engineer/ServiceHistory.jsx'
+import SLATracker from './components/service-engineer/SLATracker.jsx'
+import CustomerFeedback from './components/service-engineer/CustomerFeedback.jsx'
+import DailyUpdate from './components/service-engineer/DailyUpdate.jsx'
 import AdminDashboard from './components/AdminDashboard.jsx'
 import AdminSalesPerformance from './components/AdminSalesPerformance.jsx'
 import AddProduct from './components/AddProduct.jsx'
@@ -116,6 +128,39 @@ export default function App() {
                 } 
               />
               
+              {/* NEW SALESMAN MODULE - Clean Architecture with Attendance Gate */}
+              
+              {/* Attendance Page - Always accessible (no gate) */}
+              <Route 
+                path="/salesman/attendance" 
+                element={
+                  <ProtectedRoute allowedRoles={['SALESMAN', 'ADMIN']}>
+                    <SalesmanLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route index element={<SalesmanAttendance />} />
+              </Route>
+              
+              {/* Salesman pages - No attendance blocking */}
+              <Route 
+                path="/salesman" 
+                element={
+                  <ProtectedRoute allowedRoles={['SALESMAN', 'ADMIN']}>
+                    <SalesmanLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route path="dashboard" element={<SalesmanDashboard />} />
+                <Route path="enquiries" element={<SalesmanEnquiries />} />
+                <Route path="calls" element={<SalesmanCalls />} />
+                <Route path="followups" element={<SalesmanFollowUps />} />
+                <Route path="orders" element={<SalesmanOrders />} />
+                <Route path="daily-report" element={<SalesmanDailyReport />} />
+                <Route path="compliance" element={<SalesmanCompliance />} />
+              </Route>
+              
+              {/* Backward compatibility - redirect old routes */}
               <Route 
                 path="/employee/salesman" 
                 element={
@@ -125,86 +170,47 @@ export default function App() {
                 } 
               />
               
+              {/* Service Engineer Menu Pages - Nested Routes with Sidebar */}
               <Route 
-                path="/salesman/dashboard" 
+                path="/service-engineer" 
                 element={
-                  <ProtectedRoute allowedRoles={['SALESMAN', 'ADMIN']}>
-                    <SalesmanDashboard />
+                  <ProtectedRoute allowedRoles={['SERVICE_ENGINEER', 'ADMIN']}>
+                    <ServiceEngineerLayout />
                   </ProtectedRoute>
-                } 
-              />
+                }
+              >
+                <Route index element={<EngineerDashboard />} />
+                <Route path="dashboard" element={<EngineerDashboard />} />
+                <Route path="attendance" element={<DailyStart />} />
+                <Route path="jobs" element={<AssignedJobs />} />
+                <Route path="history" element={<ServiceHistory />} />
+                <Route path="sla-tracker" element={<SLATracker />} />
+                <Route path="feedback" element={<CustomerFeedback />} />
+                <Route path="daily-report" element={<DailyUpdate />} />
+              </Route>
               
-              <Route 
-                path="/salesman/followups" 
-                element={
-                  <ProtectedRoute allowedRoles={['SALESMAN', 'ADMIN']}>
-                    <SalesmanFollowUps />
-                  </ProtectedRoute>
-                } 
-              />
-              
-              <Route 
-                path="/salesman/visits" 
-                element={
-                  <ProtectedRoute allowedRoles={['SALESMAN', 'ADMIN']}>
-                    <SalesmanVisits />
-                  </ProtectedRoute>
-                } 
-              />
-              
-              <Route 
-                path="/salesman/daily-report" 
-                element={
-                  <ProtectedRoute allowedRoles={['SALESMAN', 'ADMIN']}>
-                    <SalesmanDailyReport />
-                  </ProtectedRoute>
-                } 
-              />
-              
-              <Route 
-                path="/salesman/attendance" 
-                element={
-                  <ProtectedRoute allowedRoles={['SALESMAN', 'ADMIN']}>
-                    <SalesmanAttendance />
-                  </ProtectedRoute>
-                } 
-              />
-              
-              <Route 
-                path="/salesman/enquiries" 
-                element={
-                  <ProtectedRoute allowedRoles={['SALESMAN', 'ADMIN']}>
-                    <SalesmanEnquiries />
-                  </ProtectedRoute>
-                } 
-              />
-              
-              <Route 
-                path="/salesman/performance" 
-                element={
-                  <ProtectedRoute allowedRoles={['SALESMAN', 'ADMIN']}>
-                    <SalesmanDashboard />
-                  </ProtectedRoute>
-                } 
-              />
-              
+              {/* Backward compatibility routes */}
               <Route 
                 path="/employee/service-engineer" 
                 element={
                   <ProtectedRoute allowedRoles={['SERVICE_ENGINEER', 'ADMIN']}>
-                    <ServiceEngineerDashboard />
+                    <ServiceEngineerLayout />
                   </ProtectedRoute>
-                } 
-              />
+                }
+              >
+                <Route index element={<EngineerDashboard />} />
+              </Route>
               
               <Route 
                 path="/engineer/dashboard" 
                 element={
                   <ProtectedRoute allowedRoles={['SERVICE_ENGINEER', 'ADMIN']}>
-                    <ServiceEngineerDashboard />
+                    <ServiceEngineerLayout />
                   </ProtectedRoute>
-                } 
-              />
+                }
+              >
+                <Route index element={<EngineerDashboard />} />
+              </Route>
               
               <Route 
                 path="/products/add" 

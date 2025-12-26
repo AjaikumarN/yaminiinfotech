@@ -68,7 +68,7 @@ class Enquiry(Base):
     product_interest = Column(String)  # Keep for backward compatibility
     priority = Column(String, default="WARM")  # HOT, WARM, COLD
     status = Column(String, default="NEW")
-    source = Column(String, default="website")  # website, call, walk-in
+    source = Column(String, default="website")  # website, call, walk-in, field_visit, phone
     assigned_to = Column(Integer, ForeignKey("users.id"))
     next_follow_up = Column(DateTime)
     last_follow_up = Column(DateTime)
@@ -79,10 +79,18 @@ class Enquiry(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     created_by = Column(String)
     
+    # Enhanced fields for conversion tracking
+    last_followup_at = Column(DateTime)  # Last follow-up timestamp
+    converted_to_order = Column(Boolean, default=False)  # Conversion flag
+    order_id = Column(Integer, ForeignKey("orders.id"))  # Link to order
+    
     # Relationships
     customer = relationship("Customer", back_populates="enquiries")
     product = relationship("Product")
     assigned_user = relationship("User", back_populates="enquiries", foreign_keys=[assigned_to])
+    # Explicitly define the order relationships to avoid ambiguity
+    orders = relationship("Order", foreign_keys="Order.enquiry_id", back_populates="enquiry")
+    converted_order = relationship("Order", foreign_keys=[order_id], back_populates="source_enquiry")
 
 # FollowUpHistory removed - using SalesFollowUp as single source of truth
 
@@ -99,6 +107,10 @@ class SalesFollowUp(Base):
     completed_at = Column(DateTime)
     created_at = Column(DateTime, default=datetime.utcnow)
     created_by = Column(Integer, ForeignKey("users.id"))  # Track who created
+    
+    # Enhanced fields for voice-to-text
+    voice_note_text = Column(Text)  # Transcribed follow-up notes
+    outcome = Column(String)  # Follow-up result (Interested, Not Interested, Callback, etc.)
 
 # EnquiryNote removed - merged into SalesFollowUp with note_type field
 
@@ -120,7 +132,7 @@ class Complaint(Base):
     # SLA Fields
     sla_time = Column(DateTime)  # When SLA expires
     sla_warning_sent = Column(Boolean, default=False)
-    sla_breach_notified = Column(Boolean, default=False)
+    sla_breach_sent = Column(Boolean, default=False)  # Updated field name for consistency
     
     # Service completion fields
     completed_at = Column(DateTime)
@@ -180,6 +192,12 @@ class SalesCall(Base):
     notes = Column(Text)
     call_date = Column(DateTime, default=datetime.utcnow)
     
+    # Enhanced fields for voice-to-text and tracking
+    call_outcome = Column(String)  # Success, No Answer, Callback, etc.
+    next_action_date = Column(DateTime)  # When to follow up
+    voice_note_text = Column(Text)  # Transcribed voice note
+    enquiry_id = Column(Integer, ForeignKey("enquiries.id"))  # Link to enquiry
+    
     salesman = relationship("User", back_populates="sales_calls")
 
 class ShopVisit(Base):
@@ -202,19 +220,33 @@ class ShopVisit(Base):
     notes = Column(Text)
     visit_date = Column(DateTime, default=datetime.utcnow)
     created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Enhanced fields for GPS and voice
+    gps_lat = Column(Float)  # Visit GPS latitude
+    gps_lng = Column(Float)  # Visit GPS longitude
+    photo_url = Column(String)  # Visit photo
+    voice_note_text = Column(Text)  # Transcribed voice note
+    enquiry_id = Column(Integer, ForeignKey("enquiries.id"))  # Link to enquiry
 
 class Attendance(Base):
     __tablename__ = "attendance"
     
     id = Column(Integer, primary_key=True, index=True)
     employee_id = Column(Integer, ForeignKey("users.id"))
-    date = Column(DateTime, default=datetime.utcnow)
+    date = Column(DateTime, default=datetime.utcnow)  # UTC timestamp for logs
+    attendance_date = Column(Date, nullable=False, index=True)  # Business date (IST) - SINGLE SOURCE OF TRUTH
     time = Column(String)
     location = Column(String)
     latitude = Column(Float)
     longitude = Column(Float)
     photo_path = Column(String)
-    status = Column(String, default="Present")
+    status = Column(String, default="Present")  # Present, Late, Absent
+    
+    # Enhanced fields for smart ERP
+    check_in_time = Column(String)  # HH:MM:SS format
+    check_in_lat = Column(Float)  # GPS latitude
+    check_in_lng = Column(Float)  # GPS longitude
+    photo_url = Column(String)  # Photo URL/path
     
     employee = relationship("User", back_populates="attendance_records")
 
@@ -393,7 +425,8 @@ class Order(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
-    enquiry = relationship("Enquiry")
+    enquiry = relationship("Enquiry", foreign_keys=[enquiry_id], back_populates="orders")
+    source_enquiry = relationship("Enquiry", foreign_keys="Enquiry.order_id", back_populates="converted_order", uselist=False)
     salesman = relationship("User", foreign_keys=[salesman_id])
     customer = relationship("Customer")
     product = relationship("Product")
@@ -418,6 +451,12 @@ class DailyReport(Base):
     report_submitted = Column(Boolean, default=False)
     submission_time = Column(DateTime)
     created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Enhanced fields for smart tracking
+    voice_note_text = Column(Text)  # Transcribed daily summary
+    total_distance_km = Column(Float, default=0)  # Distance traveled
+    work_start_time = Column(DateTime)  # Day start time
+    work_end_time = Column(DateTime)  # Day end time
     
     # Relationship
     salesman = relationship("User", foreign_keys=[salesman_id])
@@ -456,3 +495,24 @@ class StockMovement(Base):
     
     logged_by_user = relationship("User", foreign_keys=[logged_by])
     approved_by_user = relationship("User", foreign_keys=[approved_by])
+
+class ServiceEngineerDailyReport(Base):
+    """Service Engineer Daily Report - End-of-day activity log"""
+    __tablename__ = "service_engineer_daily_reports"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    engineer_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    report_date = Column(Date, nullable=False, default=date.today)
+    
+    # Activity metrics
+    jobs_completed = Column(Integer, default=0)
+    jobs_pending = Column(Integer, default=0)
+    issues_faced = Column(Text)  # Problems encountered during the day
+    remarks = Column(Text)  # Additional observations
+    
+    # Report metadata
+    submitted_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationship
+    engineer = relationship("User", foreign_keys=[engineer_id])

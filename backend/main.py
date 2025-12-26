@@ -12,6 +12,7 @@ from routers import customers
 from routers import enquiries
 from routers import complaints
 from routers import service_requests
+from routers import service_engineer
 from routers import feedback
 from routers import attendance
 from routers import mif
@@ -26,6 +27,7 @@ from routers import orders
 from routers import admin_sales
 from routers import visitors
 from routers import stock_movements
+from routers import analytics
 
 
 # Lifespan context manager for startup/shutdown
@@ -70,6 +72,7 @@ app.include_router(customers.router)
 app.include_router(enquiries.router)
 app.include_router(complaints.router)
 app.include_router(service_requests.router)
+app.include_router(service_engineer.router)
 app.include_router(feedback.router)
 app.include_router(attendance.router)
 app.include_router(mif.router)
@@ -84,6 +87,7 @@ app.include_router(reports.router)
 app.include_router(audit.router)
 app.include_router(visitors.router)
 app.include_router(stock_movements.router)
+app.include_router(analytics.router)
 
 @app.get("/")
 def read_root():

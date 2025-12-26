@@ -19,6 +19,7 @@ from models import (
     Notification, ReminderSchedule, User, UserRole
 )
 from notification_service import NotificationService
+from sla_utils import check_and_send_sla_notifications
 import logging
 
 logger = logging.getLogger(__name__)
@@ -192,102 +193,22 @@ def check_daily_reports():
 
 
 # ============================================
-# 3. SERVICE SLA WARNING SYSTEM
+# 3. SLA ESCALATION SYSTEM (ENHANCED)
 # ============================================
 
 def check_service_sla():
     """
-    Check for service SLA breaches
-    If late → Alert admin + office staff
-    Runs every hour
+    Enhanced SLA escalation system
+    Checks every 15 minutes and sends role-filtered notifications
     """
     db = get_db()
+    notif_service = NotificationService()
+    
     try:
-        now = datetime.utcnow()
-        
-        # Get complaints approaching or past SLA (using new status values)
-        complaints = db.query(Complaint).filter(
-            Complaint.status.in_(["ASSIGNED", "ON_THE_WAY", "IN_PROGRESS"]),
-            Complaint.sla_due.isnot(None)
-        ).all()
-        
-        # Get admin and office staff for notifications
-        admins = db.query(User).filter(User.role == UserRole.ADMIN, User.is_active == True).all()
-        office_staff = db.query(User).filter(User.role == UserRole.OFFICE_STAFF, User.is_active == True).all()
-        
-        for complaint in complaints:
-            time_remaining = complaint.sla_due - now
-            hours_remaining = time_remaining.total_seconds() / 3600
-            
-            # SLA BREACH - Already late
-            if hours_remaining < 0 and not complaint.sla_breach_notified:
-                hours_late = abs(hours_remaining)
-                
-                # Notify admin and office staff
-                for user in admins + office_staff:
-                    create_notification(
-                        db=db,
-                        user_id=user.id,
-                        title="🚨 SLA BREACH - Service Delayed!",
-                        message=f"Ticket {complaint.ticket_no} is {hours_late:.1f}h late! Customer: {complaint.customer_name}",
-                        notification_type="SERVICE_DELAY",
-                        priority="critical",
-                        module="Complaint",
-                        action_url=f"/complaint/{complaint.id}"
-                    )
-                
-                # Notify assigned engineer
-                if complaint.assigned_to:
-                    create_notification(
-                        db=db,
-                        user_id=complaint.assigned_to,
-                        title="🚨 SLA BREACH - Urgent Action Required!",
-                        message=f"Your assigned ticket {complaint.ticket_no} has exceeded SLA by {hours_late:.1f}h",
-                        notification_type="SERVICE_DELAY",
-                        priority="critical",
-                        module="Complaint",
-                        action_url=f"/complaint/{complaint.id}"
-                    )
-                
-                complaint.sla_breach_notified = True
-                # Don't change status - let service engineer manage it
-                logger.error(f"🚨 SLA BREACH: {complaint.ticket_no} - {hours_late:.1f}h late")
-            
-            # SLA WARNING - 2 hours remaining
-            elif 0 < hours_remaining < 2 and not complaint.sla_warning_sent:
-                for user in admins + office_staff:
-                    create_notification(
-                        db=db,
-                        user_id=user.id,
-                        title="⚠️ SLA Warning - Service Due Soon",
-                        message=f"Ticket {complaint.ticket_no} SLA expires in {hours_remaining:.1f}h - {complaint.customer_name}",
-                        notification_type="SERVICE_WARNING",
-                        priority="high",
-                        module="Complaint",
-                        action_url=f"/complaint/{complaint.id}"
-                    )
-                
-                if complaint.assigned_to:
-                    create_notification(
-                        db=db,
-                        user_id=complaint.assigned_to,
-                        title="⚠️ SLA Warning - Action Required",
-                        message=f"Ticket {complaint.ticket_no} SLA expires in {hours_remaining:.1f}h",
-                        notification_type="SERVICE_WARNING",
-                        priority="high",
-                        module="Complaint",
-                        action_url=f"/complaint/{complaint.id}"
-                    )
-                
-                complaint.sla_warning_sent = True
-                logger.warning(f"⚠️ SLA WARNING: {complaint.ticket_no} - {hours_remaining:.1f}h remaining")
-        
-        db.commit()
-        logger.info(f"✅ SLA checks completed at {datetime.utcnow()}")
-        
+        result = check_and_send_sla_notifications(db, notif_service)
+        logger.info(f"✅ SLA Check: {result['warnings_sent']} warnings, {result['breaches_sent']} breaches")
     except Exception as e:
-        logger.error(f"❌ Error in SLA check: {str(e)}")
-        db.rollback()
+        logger.error(f"❌ SLA check failed: {str(e)}")
     finally:
         db.close()
 
@@ -397,12 +318,12 @@ def start_scheduler():
         replace_existing=True
     )
     
-    # 3. Check service SLA every hour
+    # 3. Check service SLA every 15 minutes (enhanced)
     scheduler.add_job(
         check_service_sla,
-        CronTrigger(minute=30),  # Every hour at minute 30
-        id='service_sla',
-        name='Check Service SLA',
+        CronTrigger(minute='*/15'),  # Every 15 minutes
+        id='service_sla_escalation',
+        name='SLA Escalation Check',
         replace_existing=True
     )
     

@@ -134,9 +134,9 @@ def delete_enquiry(
 def create_followup(
     followup: schemas.FollowUpCreate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user)
+    current_user: models.User = Depends(auth.require_attendance_today)
 ):
-    """Create a new follow-up (Salesman only)"""
+    """Create a new follow-up (Salesman only) - Attendance required"""
     if current_user.role != models.UserRole.SALESMAN:
         raise HTTPException(status_code=403, detail="Only salesmen can create follow-ups")
     
@@ -145,19 +145,28 @@ def create_followup(
     if not enquiry or enquiry.assigned_to != current_user.id:
         raise HTTPException(status_code=403, detail="You can only create follow-ups for your assigned enquiries")
     
-    return crud.create_followup(db=db, followup=followup, salesman_id=current_user.id)
-
-@router.get("/followups", response_model=List[schemas.FollowUp])
-def get_my_followups(
-    status: str = None,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user)
-):
-    """Get my follow-ups (Salesman only)"""
-    if current_user.role != models.UserRole.SALESMAN:
-        raise HTTPException(status_code=403, detail="Only salesmen can view follow-ups")
+    # 📘 NOTEBOOK RULE: Max 5 pending follow-ups without status change → alert Reception
+    pending_count = db.query(models.SalesFollowUp).filter(
+        models.SalesFollowUp.enquiry_id == followup.enquiry_id,
+        models.SalesFollowUp.status == "Pending"
+    ).count()
     
-    return crud.get_followups_by_salesman(db=db, salesman_id=current_user.id, status=status)
+    if pending_count >= 5 and enquiry.status == "NEW":
+        # Send alert to reception
+        try:
+            NotificationService.create_notification(
+                db=db,
+                title=f"⚠️ Excessive Follow-ups: {enquiry.customer_name}",
+                message=f"Enquiry #{enquiry.enquiry_id} has {pending_count} pending follow-ups without conversion by {current_user.full_name}",
+                type="ALERT",
+                user_id=None,  # To all reception
+                role=models.UserRole.RECEPTION
+            )
+        except Exception as e:
+            import logging
+            logging.error(f"Failed to send follow-up alert: {e}")
+    
+    return crud.create_followup(db=db, followup=followup, salesman_id=current_user.id)
 
 @router.get("/{enquiry_id}/followups", response_model=List[schemas.FollowUp])
 def get_enquiry_followups(
@@ -188,9 +197,9 @@ def update_followup(
     followup_id: int,
     followup: schemas.FollowUpUpdate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user)
+    current_user: models.User = Depends(auth.require_attendance_today)
 ):
-    """Update follow-up status (Salesman only)"""
+    """Update follow-up status (Salesman only) - Attendance required"""
     if current_user.role != models.UserRole.SALESMAN:
         raise HTTPException(status_code=403, detail="Only salesmen can update follow-ups")
     
@@ -203,3 +212,15 @@ def update_followup(
     if not updated:
         raise HTTPException(status_code=404, detail="Follow-up not found")
     return updated
+
+@router.get("/followups/mine", response_model=List[schemas.FollowUp])
+def get_my_followups(
+    status: str = None,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_attendance_today)
+):
+    """Get my follow-ups (Salesman only) - Attendance required"""
+    if current_user.role != models.UserRole.SALESMAN:
+        raise HTTPException(status_code=403, detail="Only salesmen can view follow-ups")
+    
+    return crud.get_followups_by_salesman(db=db, salesman_id=current_user.id, status=status)

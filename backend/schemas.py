@@ -130,7 +130,7 @@ class Complaint(ComplaintBase):
     assigned_to: Optional[int]
     sla_time: Optional[datetime]
     sla_warning_sent: bool
-    sla_breach_notified: bool
+    sla_breach_sent: bool  # Updated field name for consistency
     created_at: datetime
     completed_at: Optional[datetime]
     resolution_notes: Optional[str] = None
@@ -442,4 +442,23 @@ class SalesFunnelData(BaseModel):
     quoted: int
     converted: int
     lost: int
+
+# Service Engineer Daily Report Schemas
+class ServiceEngineerDailyReportBase(BaseModel):
+    jobs_completed: int
+    jobs_pending: int
+    issues_faced: Optional[str] = None
+    remarks: Optional[str] = None
+
+class ServiceEngineerDailyReportCreate(ServiceEngineerDailyReportBase):
+    pass
+
+class ServiceEngineerDailyReport(ServiceEngineerDailyReportBase):
+    id: int
+    engineer_id: int
+    report_date: datetime
+    submitted_at: datetime
+    
+    class Config:
+        from_attributes = True
 
