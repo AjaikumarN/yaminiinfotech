@@ -1,0 +1,131 @@
+{
+  "timestamp": "2025-12-27T17:20:39.984528",
+  "summary": {
+    "total": 20,
+    "passed": 20,
+    "failed": 0,
+    "success_rate": "100.0%"
+  },
+  "tests": [
+    {
+      "test": "Admin Login",
+      "status": true,
+      "message": "Token received",
+      "timestamp": "2025-12-27T17:20:39.558507"
+    },
+    {
+      "test": "Salesman Login",
+      "status": true,
+      "message": "For permission testing",
+      "timestamp": "2025-12-27T17:20:39.739464"
+    },
+    {
+      "test": "Dashboard Analytics",
+      "status": true,
+      "message": "Sales: {'total_enquiries': 26, 'converted': 1, 'pending': 17}, Service: {'total_requests': 10, 'completed': 8, 'pending': 2, 'sla_breached': 1}",
+      "timestamp": "2025-12-27T17:20:39.751501"
+    },
+    {
+      "test": "Get All Users",
+      "status": true,
+      "message": "Found 13 users",
+      "timestamp": "2025-12-27T17:20:39.754868"
+    },
+    {
+      "test": "Create User",
+      "status": true,
+      "message": "User testuser_1766836239754 created",
+      "timestamp": "2025-12-27T17:20:39.932657"
+    },
+    {
+      "test": "Permission: Salesman Cannot Create User",
+      "status": true,
+      "message": "403 Forbidden as expected",
+      "timestamp": "2025-12-27T17:20:39.935293"
+    },
+    {
+      "test": "Get All Orders",
+      "status": true,
+      "message": "Found 1 orders",
+      "timestamp": "2025-12-27T17:20:39.938614"
+    },
+    {
+      "test": "Approve Order",
+      "status": true,
+      "message": "No pending orders to test",
+      "timestamp": "2025-12-27T17:20:39.941466"
+    },
+    {
+      "test": "Permission: Salesman Cannot Approve",
+      "status": true,
+      "message": "No orders to test",
+      "timestamp": "2025-12-27T17:20:39.943790"
+    },
+    {
+      "test": "Get All Invoices",
+      "status": true,
+      "message": "Found 1 invoices",
+      "timestamp": "2025-12-27T17:20:39.946214"
+    },
+    {
+      "test": "Create Invoice",
+      "status": true,
+      "message": "Invoice created successfully",
+      "timestamp": "2025-12-27T17:20:39.950359"
+    },
+    {
+      "test": "Get Today's Attendance",
+      "status": true,
+      "message": "Found 12 records",
+      "timestamp": "2025-12-27T17:20:39.957610"
+    },
+    {
+      "test": "Correct Attendance",
+      "status": true,
+      "message": "No attendance to correct",
+      "timestamp": "2025-12-27T17:20:39.964002"
+    },
+    {
+      "test": "Get Service Requests",
+      "status": true,
+      "message": "Found 10 requests",
+      "timestamp": "2025-12-27T17:20:39.967252"
+    },
+    {
+      "test": "Get SLA Summary",
+      "status": true,
+      "message": "Breaches: 0",
+      "timestamp": "2025-12-27T17:20:39.970012"
+    },
+    {
+      "test": "Get All Products",
+      "status": true,
+      "message": "Found 20 products",
+      "timestamp": "2025-12-27T17:20:39.973118"
+    },
+    {
+      "test": "Get Stock Movements",
+      "status": true,
+      "message": "Found 4 movements",
+      "timestamp": "2025-12-27T17:20:39.976798"
+    },
+    {
+      "test": "Get All Enquiries",
+      "status": true,
+      "message": "Found 26 enquiries",
+      "timestamp": "2025-12-27T17:20:39.979640"
+    },
+    {
+      "test": "Get Audit Logs",
+      "status": true,
+      "message": "Found 8 log entries",
+      "timestamp": "2025-12-27T17:20:39.983065"
+    },
+    {
+      "test": "Security: Cannot Delete Audit Logs",
+      "status": true,
+      "message": "Delete blocked with status 404",
+      "timestamp": "2025-12-27T17:20:39.984312"
+    }
+  ]
+}
