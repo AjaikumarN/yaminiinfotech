@@ -83,25 +83,27 @@ export default function Header({ showNotificationPanel, setShowNotificationPanel
     />
     <header className="site-header">
       <div className="topbar">
-        <button className="menu-toggle" onClick={() => {
-          if (location.pathname.startsWith('/reception')) {
-            // Dispatch custom event for reception sidebar
-            window.dispatchEvent(new Event('toggleReceptionMenu'));
-          } else if (location.pathname.startsWith('/service-engineer')) {
-            // Dispatch custom event for service engineer sidebar
-            window.dispatchEvent(new Event('toggleServiceEngineerMenu'));
-          } else if (location.pathname.startsWith('/salesman')) {
-            // Dispatch custom event for salesman sidebar
-            window.dispatchEvent(new Event('toggleSalesmanMenu'));
-          } else if (location.pathname.startsWith('/admin')) {
-            // Dispatch custom event for admin sidebar
-            window.dispatchEvent(new Event('toggleAdminMenu'));
-          } else {
-            toggleMenu();
-          }
-        }} aria-label="Menu">
-          {menuOpen ? <FiX /> : <FiMenu />}
-        </button>
+        {!(location.pathname === '/' || location.pathname.startsWith('/login')) && (
+          <button className="menu-toggle" onClick={() => {
+            if (location.pathname.startsWith('/reception')) {
+              // Dispatch custom event for reception sidebar
+              window.dispatchEvent(new Event('toggleReceptionMenu'));
+            } else if (location.pathname.startsWith('/service-engineer') || location.pathname.startsWith('/engineer')) {
+              // Dispatch custom event for service engineer sidebar (supports both route variants)
+              window.dispatchEvent(new Event('toggleServiceEngineerMenu'));
+            } else if (location.pathname.startsWith('/salesman')) {
+              // Dispatch custom event for salesman sidebar
+              window.dispatchEvent(new Event('toggleSalesmanMenu'));
+            } else if (location.pathname.startsWith('/admin')) {
+              // Dispatch custom event for admin sidebar
+              window.dispatchEvent(new Event('toggleAdminMenu'));
+            } else {
+              toggleMenu();
+            }
+          }} aria-label="Menu">
+            {menuOpen ? <FiX /> : <FiMenu />}
+          </button>
+        )}
         <div className="logo-wrap">
           <img src="/assets/main_logo.png" alt="Yamini Infotech" className="logo-icon" />
           <div className="logo-text">
@@ -199,7 +201,7 @@ export default function Header({ showNotificationPanel, setShowNotificationPanel
               
               {user?.role === 'OFFICE_STAFF' && (
                 <li className="menu-item">
-                  <Link to="/admin/products" onClick={closeMenu} className="menu-link">Office Staff Dashboard</Link>
+                  <Link to="/office/dashboard" onClick={closeMenu} className="menu-link">Office Staff Dashboard</Link>
                 </li>
               )}
               
@@ -220,7 +222,7 @@ export default function Header({ showNotificationPanel, setShowNotificationPanel
                       <ul className="submenu">
                         <li><Link to="/salesman/dashboard" onClick={closeMenu}>Salesman</Link></li>
                         <li><Link to="/engineer/dashboard" onClick={closeMenu}>Service Engineer</Link></li>
-                        <li><Link to="/admin/products" onClick={closeMenu}>Office Staff</Link></li>
+                        <li><Link to="/office/dashboard" onClick={closeMenu}>Office Staff</Link></li>
                       </ul>
                     )}
                   </li>

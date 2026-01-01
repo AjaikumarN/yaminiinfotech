@@ -24,6 +24,30 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     
+    # Personal Information
+    gender = Column(String)
+    date_of_birth = Column(Date)
+    phone = Column(String)
+    mobile = Column(String)
+    current_address = Column(Text)
+    permanent_address = Column(Text)
+    
+    # Identification / KYC
+    employee_id = Column(String, unique=True, index=True)
+    nationality = Column(String, default="Indian")
+    photograph = Column(String)  # Store file path or URL
+    
+    # Employment Details
+    date_of_joining = Column(Date)
+    
+    # Salary & Payroll
+    salary = Column(Float)
+    monthly_pay = Column(Float)  # Alias for salary
+    bank_name = Column(String)
+    bank = Column(String)  # Alias for bank_name
+    account_number = Column(String)
+    bank_account = Column(String)  # Alias for account_number
+    
     # Relationships
     enquiries = relationship("Enquiry", back_populates="assigned_user", foreign_keys="Enquiry.assigned_to")
     complaints = relationship("Complaint", back_populates="assigned_engineer")
@@ -518,3 +542,182 @@ class ServiceEngineerDailyReport(Base):
     
     # Relationship
     engineer = relationship("User", foreign_keys=[engineer_id])
+
+
+# ===========================
+# CHATBOT MODELS
+# ===========================
+
+class ChatbotKnowledge(Base):
+    """Knowledge base documents for RAG (FAISS vectorization)"""
+    __tablename__ = "chatbot_knowledge"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String, nullable=False, index=True)
+    content = Column(Text, nullable=False)  # Actual knowledge content
+    content_en = Column(Text)  # English version
+    content_ta = Column(Text)  # Tamil version
+    category = Column(String, index=True)  # faq, product, service, amc, policy, warranty, complaint
+    subcategory = Column(String)  # More specific categorization
+    keywords = Column(Text)  # Comma-separated keywords for search
+    
+    # Vector embedding (stored as JSON array)
+    embedding_en = Column(Text)  # FAISS vector for English (JSON)
+    embedding_ta = Column(Text)  # FAISS vector for Tamil (JSON)
+    
+    # Control flags
+    is_active = Column(Boolean, default=True)
+    priority = Column(Integer, default=0)  # Higher = more important
+    
+    # Metadata
+    created_by = Column(Integer, ForeignKey("users.id"))
+    updated_by = Column(Integer, ForeignKey("users.id"))
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    last_used_at = Column(DateTime)  # Track usage for analytics
+    usage_count = Column(Integer, default=0)  # How many times retrieved
+    
+    # Relationships
+    creator = relationship("User", foreign_keys=[created_by])
+    updater = relationship("User", foreign_keys=[updated_by])
+
+
+class ChatSession(Base):
+    """Customer chat sessions"""
+    __tablename__ = "chat_sessions"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(String, unique=True, index=True, nullable=False)  # UUID
+    
+    # Customer identification (optional - can chat anonymously)
+    customer_id = Column(Integer, ForeignKey("customers.id"))
+    customer_phone = Column(String)
+    customer_email = Column(String)
+    customer_name = Column(String)
+    
+    # Session metadata
+    language = Column(String, default="en")  # en, ta
+    device_info = Column(String)  # Browser/device fingerprint
+    ip_address = Column(String)
+    
+    # Session status
+    status = Column(String, default="active")  # active, handed_off, closed, escalated
+    handoff_to = Column(Integer, ForeignKey("users.id"))  # Receptionist who took over
+    handoff_at = Column(DateTime)
+    
+    # Analytics
+    message_count = Column(Integer, default=0)
+    avg_confidence = Column(Float)  # Average bot confidence
+    enquiry_created = Column(Boolean, default=False)
+    enquiry_id = Column(Integer, ForeignKey("enquiries.id"))
+    
+    # Timestamps
+    started_at = Column(DateTime, default=datetime.utcnow)
+    last_message_at = Column(DateTime, default=datetime.utcnow)
+    closed_at = Column(DateTime)
+    
+    # Relationships
+    customer = relationship("Customer")
+    messages = relationship("ChatMessage", back_populates="session")
+    handoff_user = relationship("User", foreign_keys=[handoff_to])
+    enquiry = relationship("Enquiry")
+
+
+class ChatMessage(Base):
+    """Individual chat messages"""
+    __tablename__ = "chat_messages"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(Integer, ForeignKey("chat_sessions.id"), nullable=False, index=True)
+    
+    # Message content
+    message = Column(Text, nullable=False)
+    sender = Column(String, nullable=False)  # customer, bot, receptionist
+    language = Column(String, default="en")
+    
+    # Bot intelligence data
+    intent_detected = Column(String)  # enquiry, complaint, service, amc, pricing, general
+    confidence_score = Column(Float)  # 0.0 to 1.0
+    knowledge_docs_used = Column(Text)  # JSON array of document IDs used
+    
+    # Handoff/escalation
+    triggered_handoff = Column(Boolean, default=False)
+    handoff_reason = Column(String)  # low_confidence, explicit_request, repeated_query
+    
+    # Timestamps
+    sent_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    session = relationship("ChatSession", back_populates="messages")
+
+
+class ChatbotHandoff(Base):
+    """Receptionist handoff queue"""
+    __tablename__ = "chatbot_handoffs"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(Integer, ForeignKey("chat_sessions.id"), nullable=False)
+    
+    # Handoff details
+    reason = Column(String, nullable=False)  # low_confidence, customer_request, complex_query
+    priority = Column(String, default="normal")  # urgent, normal, low
+    status = Column(String, default="pending")  # pending, assigned, resolved
+    
+    # Assignment
+    assigned_to = Column(Integer, ForeignKey("users.id"))
+    assigned_at = Column(DateTime)
+    resolved_at = Column(DateTime)
+    resolution_notes = Column(Text)
+    
+    # Context for receptionist
+    customer_name = Column(String)
+    customer_phone = Column(String)
+    summary = Column(Text)  # AI-generated summary of conversation
+    last_messages = Column(Text)  # JSON: Last 5 messages
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    session = relationship("ChatSession")
+    assigned_user = relationship("User")
+
+
+class ChatbotAnalytics(Base):
+    """Daily chatbot performance metrics"""
+    __tablename__ = "chatbot_analytics"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(Date, nullable=False, unique=True, index=True)
+    
+    # Volume metrics
+    total_sessions = Column(Integer, default=0)
+    total_messages = Column(Integer, default=0)
+    unique_customers = Column(Integer, default=0)
+    
+    # Language split
+    sessions_en = Column(Integer, default=0)
+    sessions_ta = Column(Integer, default=0)
+    
+    # Performance
+    avg_confidence = Column(Float)
+    avg_session_duration = Column(Float)  # seconds
+    avg_messages_per_session = Column(Float)
+    
+    # Outcomes
+    enquiries_created = Column(Integer, default=0)
+    handoffs_triggered = Column(Integer, default=0)
+    sessions_resolved = Column(Integer, default=0)
+    
+    # Top intents
+    top_intent_1 = Column(String)
+    top_intent_1_count = Column(Integer, default=0)
+    top_intent_2 = Column(String)
+    top_intent_2_count = Column(Integer, default=0)
+    top_intent_3 = Column(String)
+    top_intent_3_count = Column(Integer, default=0)
+    
+    # Knowledge gaps (unanswered questions)
+    unanswered_queries = Column(Text)  # JSON array
+    
+    created_at = Column(DateTime, default=datetime.utcnow)

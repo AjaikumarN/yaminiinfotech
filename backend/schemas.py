@@ -1,6 +1,6 @@
-from pydantic import BaseModel, EmailStr
-from typing import Optional, List
-from datetime import datetime
+from pydantic import BaseModel, EmailStr, field_validator
+from typing import Optional, List, Union
+from datetime import datetime, date
 from models import UserRole  # OFFICE_STAFF removed - merged into RECEPTION
 
 # User Schemas
@@ -10,6 +10,30 @@ class UserBase(BaseModel):
     full_name: Optional[str] = None
     role: UserRole
     department: Optional[str] = None
+    
+    # Personal Information
+    gender: Optional[str] = None
+    date_of_birth: Optional[Union[date, str]] = None
+    phone: Optional[str] = None
+    mobile: Optional[str] = None
+    current_address: Optional[str] = None
+    permanent_address: Optional[str] = None
+    
+    # Identification / KYC
+    employee_id: Optional[str] = None
+    nationality: Optional[str] = "Indian"
+    photograph: Optional[str] = None
+    
+    # Employment Details
+    date_of_joining: Optional[Union[date, str]] = None
+    
+    # Salary & Payroll
+    salary: Optional[float] = None
+    monthly_pay: Optional[float] = None
+    bank_name: Optional[str] = None
+    bank: Optional[str] = None
+    account_number: Optional[str] = None
+    bank_account: Optional[str] = None
 
 class UserCreate(UserBase):
     password: str
@@ -22,6 +46,30 @@ class UserUpdate(BaseModel):
     department: Optional[str] = None
     password: Optional[str] = None
     is_active: Optional[bool] = None
+    
+    # Personal Information
+    gender: Optional[str] = None
+    date_of_birth: Optional[Union[date, str]] = None
+    phone: Optional[str] = None
+    mobile: Optional[str] = None
+    current_address: Optional[str] = None
+    permanent_address: Optional[str] = None
+    
+    # Identification / KYC
+    employee_id: Optional[str] = None
+    nationality: Optional[str] = None
+    photograph: Optional[str] = None
+    
+    # Employment Details
+    date_of_joining: Optional[Union[date, str]] = None
+    
+    # Salary & Payroll
+    salary: Optional[float] = None
+    monthly_pay: Optional[float] = None
+    bank_name: Optional[str] = None
+    bank: Optional[str] = None
+    account_number: Optional[str] = None
+    bank_account: Optional[str] = None
 
 class UserLogin(BaseModel):
     username: str
@@ -77,6 +125,7 @@ class EnquiryCreate(EnquiryBase):
     product_id: Optional[int] = None  # Link to product table
     source: Optional[str] = "website"
     description: Optional[str] = None
+    assigned_to: Optional[int] = None  # Allow assignment during creation
 
 class EnquiryUpdate(BaseModel):
     priority: Optional[str] = None
@@ -387,10 +436,10 @@ class OrderApprove(BaseModel):
 class Order(BaseModel):
     id: int
     order_id: str
-    enquiry_id: int
-    salesman_id: int
-    customer_id: int
-    product_id: int
+    enquiry_id: Optional[int] = None
+    salesman_id: Optional[int] = None
+    customer_id: Optional[int] = None
+    product_id: Optional[int] = None
     customer_name: str
     product_name: str
     quantity: int
@@ -464,3 +513,91 @@ class ServiceEngineerDailyReport(ServiceEngineerDailyReportBase):
     class Config:
         from_attributes = True
 
+
+# ===========================
+# CHATBOT SCHEMAS
+# ===========================
+
+class ChatbotKnowledgeBase(BaseModel):
+    title: str
+    content: str
+    content_en: Optional[str] = None
+    content_ta: Optional[str] = None
+    category: str  # faq, product, service, amc, policy
+    subcategory: Optional[str] = None
+    keywords: Optional[str] = None
+
+class ChatbotKnowledgeCreate(ChatbotKnowledgeBase):
+    pass
+
+class ChatbotKnowledgeUpdate(BaseModel):
+    title: Optional[str] = None
+    content: Optional[str] = None
+    content_en: Optional[str] = None
+    content_ta: Optional[str] = None
+    category: Optional[str] = None
+    subcategory: Optional[str] = None
+    keywords: Optional[str] = None
+    is_active: Optional[bool] = None
+    priority: Optional[int] = None
+
+class ChatbotKnowledge(ChatbotKnowledgeBase):
+    id: int
+    is_active: bool
+    priority: int
+    usage_count: int
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class ChatMessageRequest(BaseModel):
+    session_id: Optional[str] = None  # For continuing conversation
+    message: str
+    customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
+    customer_email: Optional[str] = None
+    language: Optional[str] = "en"  # en or ta
+
+class ChatMessageResponse(BaseModel):
+    session_id: str
+    reply: str
+    confidence: float
+    intent: Optional[str] = None
+    handoff_needed: bool = False
+    enquiry_created: bool = False
+    enquiry_id: Optional[int] = None
+    suggestions: Optional[List[str]] = None  # Quick reply suggestions
+
+class ChatSessionInfo(BaseModel):
+    session_id: str
+    customer_name: Optional[str]
+    customer_phone: Optional[str]
+    language: str
+    status: str
+    message_count: int
+    started_at: datetime
+    last_message_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class ChatHandoffRequest(BaseModel):
+    session_id: str
+    reason: str
+
+class ChatHandoffInfo(BaseModel):
+    id: int
+    session_id: int
+    customer_name: Optional[str]
+    customer_phone: Optional[str]
+    reason: str
+    priority: str
+    status: str
+    summary: Optional[str]
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True

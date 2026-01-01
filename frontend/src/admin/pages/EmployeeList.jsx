@@ -59,7 +59,7 @@ export default function EmployeeList() {
   );
 
   const handleViewDashboard = (employee) => {
-    navigate(`/admin/employees/${role}/${employee.id}`);
+    navigate(`/admin/employees/${role}/${employee.id}/dashboard`);
   };
 
   if (loading) {

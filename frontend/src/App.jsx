@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext.jsx'
 import { NotificationProvider } from './contexts/NotificationContext.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
@@ -23,6 +23,7 @@ import ReceptionDashboardNew from './components/ReceptionDashboardNew.jsx'
 // NEW Salesman Module - Clean Architecture (Rebuilt from scratch)
 import SalesmanLayout from './salesman/layout/SalesmanLayout.jsx'
 import SalesmanAttendance from './salesman/pages/Attendance.jsx'
+import VerifiedAttendance from './components/attendance/VerifiedAttendance.jsx'
 import SalesmanDashboard from './salesman/pages/Dashboard.jsx'
 import SalesmanEnquiries from './salesman/pages/Enquiries.jsx'
 import SalesmanCalls from './salesman/pages/Calls.jsx'
@@ -55,7 +56,7 @@ import MissingReports from './components/reception/MissingReports.jsx'
 import VisitorLog from './components/reception/VisitorLog.jsx'
 
 // Admin Module - Properly architected (MODE not APP)
-import AdminLayout from './admin/layout/AdminLayout.jsx'
+import DashboardLayout from './layouts/DashboardLayout.jsx'
 import AdminDashboardPage from './admin/pages/Dashboard.jsx'
 import UserManagement from './admin/pages/UserManagement.jsx'
 import AdminStockManagement from './admin/pages/StockManagement.jsx'
@@ -68,29 +69,36 @@ import AdminSettings from './admin/pages/Settings.jsx'
 import EmployeeList from './admin/pages/EmployeeList.jsx'
 import EmployeeDashboardView from './admin/pages/EmployeeDashboardView.jsx'
 import NewEmployee from './admin/pages/NewEmployee.jsx'
+import EmployeeDetail from './admin/pages/EmployeeDetail.jsx'
+import AllEmployees from './admin/pages/employees/AllEmployees.jsx'
+import ChatbotControl from './admin/pages/ChatbotControl.jsx'
 
 // Invoices component (if exists)
 import Invoices from './components/Invoices.jsx'
 import Orders from './components/Orders.jsx'
+import ChatWidget from './components/ChatWidget.jsx'
 
-export default function App() {
+function App() {
   const [showNotificationPanel, setShowNotificationPanel] = useState(false)
+  const location = useLocation()
+  
+  // Determine if current route is dashboard or public
+  const isDashboard = location.pathname.startsWith('/admin') || 
+                      location.pathname.startsWith('/salesman') ||
+                      location.pathname.startsWith('/reception') ||
+                      location.pathname.startsWith('/service-engineer') ||
+                      location.pathname.startsWith('/engineer')
   
   return (
-    <AuthProvider>
-      <NotificationProvider>
-        <BrowserRouter
-          future={{
-            v7_startTransition: true,
-            v7_relativeSplatPath: true
-          }}
-        >
-          <div className="app">
-            <Header 
-              showNotificationPanel={showNotificationPanel}
-              setShowNotificationPanel={setShowNotificationPanel}
-            />
-            <Routes>
+    <div className={`app ${isDashboard ? 'dashboard-mode' : 'public-layout'}`}>
+      {/* Hide Header/Footer in dashboard views */}
+      {!isDashboard && (
+        <Header 
+          showNotificationPanel={showNotificationPanel}
+          setShowNotificationPanel={setShowNotificationPanel}
+        />
+      )}
+      <Routes>
               {/* Public routes */}
               <Route path="/" element={<Home />} />
               <Route path="/contact" element={<Contact />} />
@@ -121,7 +129,7 @@ export default function App() {
                 path="/reception" 
                 element={
                   <ProtectedRoute allowedRoles={['RECEPTION', 'ADMIN']}>
-                    <ReceptionLayout />
+                    <DashboardLayout role="RECEPTION" />
                   </ProtectedRoute>
                 }
               >
@@ -154,11 +162,11 @@ export default function App() {
                 path="/salesman/attendance" 
                 element={
                   <ProtectedRoute allowedRoles={['SALESMAN', 'ADMIN']}>
-                    <SalesmanLayout />
+                    <DashboardLayout role="SALESMAN" />
                   </ProtectedRoute>
                 }
               >
-                <Route index element={<SalesmanAttendance />} />
+                <Route index element={<VerifiedAttendance />} />
               </Route>
               
               {/* Salesman pages - No attendance blocking */}
@@ -166,7 +174,7 @@ export default function App() {
                 path="/salesman" 
                 element={
                   <ProtectedRoute allowedRoles={['SALESMAN', 'ADMIN']}>
-                    <SalesmanLayout />
+                    <DashboardLayout role="SALESMAN" />
                   </ProtectedRoute>
                 }
               >
@@ -194,13 +202,13 @@ export default function App() {
                 path="/service-engineer" 
                 element={
                   <ProtectedRoute allowedRoles={['SERVICE_ENGINEER', 'ADMIN']}>
-                    <ServiceEngineerLayout />
+                    <DashboardLayout role="SERVICE_ENGINEER" />
                   </ProtectedRoute>
                 }
               >
                 <Route index element={<EngineerDashboard />} />
                 <Route path="dashboard" element={<EngineerDashboard />} />
-                <Route path="attendance" element={<DailyStart />} />
+                <Route path="attendance" element={<VerifiedAttendance />} />
                 <Route path="jobs" element={<AssignedJobs />} />
                 <Route path="history" element={<ServiceHistory />} />
                 <Route path="sla-tracker" element={<SLATracker />} />
@@ -213,7 +221,7 @@ export default function App() {
                 path="/employee/service-engineer" 
                 element={
                   <ProtectedRoute allowedRoles={['SERVICE_ENGINEER', 'ADMIN']}>
-                    <ServiceEngineerLayout />
+                    <DashboardLayout role="SERVICE_ENGINEER" />
                   </ProtectedRoute>
                 }
               >
@@ -224,11 +232,30 @@ export default function App() {
                 path="/engineer/dashboard" 
                 element={
                   <ProtectedRoute allowedRoles={['SERVICE_ENGINEER', 'ADMIN']}>
-                    <ServiceEngineerLayout />
+                    <DashboardLayout role="SERVICE_ENGINEER" />
                   </ProtectedRoute>
                 }
               >
                 <Route index element={<EngineerDashboard />} />
+              </Route>
+              
+              {/* Engineer routes with /engineer prefix */}
+              <Route 
+                path="/engineer" 
+                element={
+                  <ProtectedRoute allowedRoles={['SERVICE_ENGINEER', 'ADMIN']}>
+                    <DashboardLayout role="SERVICE_ENGINEER" />
+                  </ProtectedRoute>
+                }
+              >
+                <Route index element={<EngineerDashboard />} />
+                <Route path="dashboard" element={<EngineerDashboard />} />
+                <Route path="attendance" element={<VerifiedAttendance />} />
+                <Route path="jobs" element={<AssignedJobs />} />
+                <Route path="history" element={<ServiceHistory />} />
+                <Route path="sla-tracker" element={<SLATracker />} />
+                <Route path="feedback" element={<CustomerFeedback />} />
+                <Route path="daily-report" element={<DailyUpdate />} />
               </Route>
               
               <Route 
@@ -253,7 +280,7 @@ export default function App() {
                 path="/admin" 
                 element={
                   <ProtectedRoute allowedRoles={['ADMIN']}>
-                    <AdminLayout />
+                    <DashboardLayout role="ADMIN" />
                   </ProtectedRoute>
                 } 
               >
@@ -262,8 +289,10 @@ export default function App() {
                 
                 {/* Employees - List and Dashboard View */}
                 <Route path="employees" element={<Navigate to="/admin/employees/salesmen" replace />} />
+                <Route path="employees/all" element={<AllEmployees />} />
                 <Route path="employees/:role" element={<EmployeeList />} />
-                <Route path="employees/:role/:userId" element={<EmployeeDashboardView />} />
+                <Route path="employees/:role/:userId/dashboard" element={<EmployeeDashboardView />} />
+                <Route path="employees/:role/:userId" element={<EmployeeDetail />} />
                 <Route path="employees/admins" element={<UserManagement role="ADMIN" />} />
                 
                 {/* Inventory - REUSE existing pages ✅ */}
@@ -284,6 +313,7 @@ export default function App() {
                 <Route path="service/overview" element={<ServiceComplaints mode="admin" />} />
                 <Route path="service/sla" element={<AdminSLAMonitoring />} />
                 <Route path="service/mif" element={<AdminMIF />} />
+                <Route path="mif" element={<AdminMIF />} />
                 
                 {/* Operations - Reuse existing */}
                 <Route path="attendance" element={<AdminAttendance />} />
@@ -292,8 +322,11 @@ export default function App() {
                 <Route path="analytics" element={<AdminAnalytics />} />
                 
                 {/* System */}
+                <Route path="audit" element={<AdminAuditLogs />} />
                 <Route path="audit-logs" element={<AdminAuditLogs />} />
+                <Route path="employees/new" element={<NewEmployee />} />
                 <Route path="new-employee" element={<NewEmployee />} />
+                <Route path="chatbot" element={<ChatbotControl />} />
                 <Route path="settings" element={<AdminSettings />} />
               </Route>
               
@@ -307,10 +340,28 @@ export default function App() {
                 } 
               />
             </Routes>
-            <Footer />
+            <ChatWidget />
+            {!isDashboard && <Footer />}
           </div>
+  )
+}
+
+// Wrapper component to provide context and router
+function AppWithProviders() {
+  return (
+    <AuthProvider>
+      <NotificationProvider>
+        <BrowserRouter
+          future={{
+            v7_startTransition: true,
+            v7_relativeSplatPath: true
+          }}
+        >
+          <App />
         </BrowserRouter>
       </NotificationProvider>
     </AuthProvider>
   )
 }
+
+export default AppWithProviders

@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 
 const ReceptionNav = ({ isOpen, onClose }) => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
   const [openSections, setOpenSections] = useState({});
 
   const sections = [
@@ -60,11 +63,11 @@ const ReceptionNav = ({ isOpen, onClose }) => {
     left: 0,
     width: '280px',
     height: '100vh',
-    background: 'linear-gradient(180deg, #f8fafc 0%, #f5f7fb 100%)',
+    background: 'linear-gradient(180deg, #ffffff 0%, #f8f9fa 100%)',
     borderRight: '1px solid #e5e7eb',
     zIndex: 100,
     overflow: 'auto',
-    boxShadow: '0 20px 38px rgba(15,23,42,0.08)',
+    boxShadow: '0 20px 38px rgba(15,23,42,0.06)',
     transition: 'all 0.3s ease',
     transform: isOpen ? 'translateX(0)' : 'translateX(-100%)'
   };
@@ -85,14 +88,15 @@ const ReceptionNav = ({ isOpen, onClose }) => {
   const logoIconStyles = {
     width: '52px',
     height: '52px',
-    borderRadius: '14px',
-    background: 'rgba(255, 255, 255, 0.25)',
+    borderRadius: '50%',
+    border: '2px solid rgba(255, 255, 255, 0.5)',
+    overflow: 'hidden',
+    background: 'rgba(255, 255, 255, 0.3)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     fontSize: '24px',
-    backdropFilter: 'blur(10px)',
-    border: '1px solid rgba(255, 255, 255, 0.3)'
+    backdropFilter: 'blur(10px)'
   };
 
   const logoTextStyles = {
@@ -185,7 +189,18 @@ const ReceptionNav = ({ isOpen, onClose }) => {
     fontWeight: '600',
     cursor: 'pointer',
     transition: 'all 0.2s',
-    textAlign: 'center'
+    textAlign: 'center',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px'
+  };
+
+  const handleLogout = () => {
+    if (confirm('Are you sure you want to logout?')) {
+      logout();
+      navigate('/login');
+    }
   };
 
   return (
@@ -212,10 +227,22 @@ const ReceptionNav = ({ isOpen, onClose }) => {
         {/* Header */}
         <div style={headerStyles}>
           <div style={logoStyles}>
-            <div style={logoIconStyles}>📞</div>
+            <div style={logoIconStyles}>
+              {user?.photo || user?.photograph ? (
+                <img 
+                  src={user.photo || user.photograph} 
+                  alt={user.name || user.full_name} 
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                />
+              ) : (
+                <span>👔</span>
+              )}
+            </div>
             <div style={logoTextStyles}>
               <h2 style={logoTitleStyles}>Reception</h2>
-              <p style={logoSubtitleStyles}>Front Desk Operations</p>
+              <p style={logoSubtitleStyles}>
+                {user?.name || user?.full_name || 'Front Desk Operations'}
+              </p>
             </div>
             <button
               onClick={onClose}
@@ -264,11 +291,13 @@ const ReceptionNav = ({ isOpen, onClose }) => {
 
         {/* Logout Button */}
         <button
+          onClick={handleLogout}
           style={logoutButtonStyles}
           onMouseEnter={(e) => e.target.style.background = '#2563eb'}
           onMouseLeave={(e) => e.target.style.background = '#3b82f6'}
         >
-          🚪 Logout
+          <span className="material-icons" style={{ fontSize: '18px' }}>logout</span>
+          <span>Logout</span>
         </button>
       </aside>
     </>

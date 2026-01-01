@@ -40,6 +40,186 @@ export default function MIF() {
     }
   };
 
+  const generatePDF = (mif) => {
+    const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Machine In Field (MIF)</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 20mm;
+    }
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 12px;
+      color: #000;
+    }
+    h1, h2, h3 {
+      margin: 0;
+      padding: 0;
+    }
+    .header {
+      text-align: center;
+      border-bottom: 2px solid #000;
+      padding-bottom: 10px;
+      margin-bottom: 15px;
+    }
+    .company-name {
+      font-size: 18px;
+      font-weight: bold;
+    }
+    .subtitle {
+      font-size: 13px;
+      margin-top: 4px;
+    }
+    .section {
+      margin-bottom: 14px;
+    }
+    .section-title {
+      font-weight: bold;
+      background: #f2f2f2;
+      padding: 6px;
+      border: 1px solid #000;
+      margin-bottom: 6px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    td, th {
+      border: 1px solid #000;
+      padding: 6px;
+      vertical-align: top;
+    }
+    .label {
+      font-weight: bold;
+      width: 30%;
+      background: #fafafa;
+    }
+    .remarks-box {
+      height: 80px;
+    }
+    .signature-table td {
+      height: 60px;
+    }
+    .confidential {
+      font-size: 10px;
+      font-style: italic;
+      border-top: 1px dashed #000;
+      padding-top: 6px;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="company-name">Yamini Infotech</div>
+    <div class="subtitle">Machine In Field (MIF) – Confidential</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Installation & Customer Information</div>
+    <table>
+      <tr>
+        <td class="label">Date</td>
+        <td>${new Date(mif.installation_date).toLocaleDateString()}</td>
+        <td class="label">Customer</td>
+        <td>${mif.customer_name}</td>
+      </tr>
+      <tr>
+        <td class="label">Machine Model</td>
+        <td>${mif.machine_model}</td>
+        <td class="label">Serial Number</td>
+        <td>${mif.serial_number}</td>
+      </tr>
+      <tr>
+        <td class="label">Installed By</td>
+        <td>${mif.engineer_name || 'N/A'}</td>
+        <td class="label">Status</td>
+        <td>${mif.status}</td>
+      </tr>
+      <tr>
+        <td class="label">Location</td>
+        <td colspan="3">${mif.location || 'N/A'}</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Machine Classification</div>
+    <table>
+      <tr>
+        <td>☐ New Installation</td>
+        <td>☐ Existing Customer</td>
+        <td>☐ Replacement / Exchange</td>
+        <td>☐ Demo Machine</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Service / AMC Details</div>
+    <table>
+      <tr>
+        <td class="label">AMC Status</td>
+        <td>${mif.amc_status}</td>
+        <td class="label">AMC Expiry</td>
+        <td>${mif.amc_expiry ? new Date(mif.amc_expiry).toLocaleDateString() : 'N/A'}</td>
+      </tr>
+      <tr>
+        <td class="label">Machine Value</td>
+        <td colspan="3">₹${parseFloat(mif.machine_value || 0).toLocaleString()}</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Remarks / Notes (Reception Use)</div>
+    <table>
+      <tr>
+        <td class="remarks-box">${mif.notes || ''}</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Verification</div>
+    <table class="signature-table">
+      <tr>
+        <td>
+          Reception / Office Staff<br /><br />
+          Name: ____________<br />
+          Signature: ____________
+        </td>
+        <td>
+          Admin Verification<br /><br />
+          Name: ____________<br />
+          Signature: ____________
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="confidential">
+    This document contains confidential operational data. Unauthorized access or sharing is strictly prohibited.
+  </div>
+</body>
+</html>
+    `;
+
+    const newWindow = window.open('', '_blank');
+    newWindow.document.write(html);
+    newWindow.document.close();
+    
+    // Wait for content to load, then trigger print dialog
+    setTimeout(() => {
+      newWindow.print();
+    }, 500);
+  };
+
   const handleCreate = async (e) => {
     e.preventDefault();
     try {
@@ -220,7 +400,7 @@ export default function MIF() {
                     </td>
                     <td style={{ padding: '14px 20px' }}>
                       <button
-                        onClick={() => window.open(`http://localhost:8000/api/mif/${mif.id}/pdf`, '_blank')}
+                        onClick={() => generatePDF(mif)}
                         style={{
                           padding: '6px 12px',
                           borderRadius: '8px',
@@ -314,7 +494,7 @@ export default function MIF() {
                   </div>
                   <div style={{ gridColumn: '1 / -1', marginTop: '8px' }}>
                     <button
-                      onClick={() => window.open(`http://localhost:8000/api/mif/${mif.id}/pdf`, '_blank')}
+                      onClick={() => generatePDF(mif)}
                       style={{
                         padding: '10px',
                         borderRadius: '8px',

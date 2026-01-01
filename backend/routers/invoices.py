@@ -70,12 +70,39 @@ def create_invoice(
 ):
     """
     Create invoice manually (admin only)
-    For orders, invoices are auto-generated on approval
+    Creates an order-based invoice
     """
     try:
-        # This would typically create a standalone invoice
-        # For now, return a mock response
-        # In production, you'd create a proper Invoice table
+        # Generate invoice number
+        invoice_count = db.query(func.count(models.Order.id)).filter(
+            models.Order.invoice_generated == True
+        ).scalar()
+        invoice_number = f"INV-{invoice_count + 1}"
+        
+        # Generate order ID
+        order_count = db.query(func.count(models.Order.id)).scalar()
+        order_id = f"ORD-{order_count + 1}"
+        
+        # Create order with invoice
+        new_order = models.Order(
+            order_id=order_id,
+            invoice_number=invoice_number,
+            customer_name=invoice_data.get("customer_name", "Direct Customer"),
+            product_name=invoice_data.get("product_name", "Service/Product"),
+            quantity=invoice_data.get("quantity", 1),
+            unit_price=invoice_data.get("unit_price", 0),
+            total_amount=invoice_data.get("total_amount", 0),
+            status="APPROVED",  # Manual invoices are pre-approved
+            invoice_generated=True,
+            salesman_id=current_user.id,
+            approved_by=current_user.id,
+            approved_at=datetime.now(),
+            notes=invoice_data.get("notes", "Manual invoice created by admin")
+        )
+        
+        db.add(new_order)
+        db.commit()
+        db.refresh(new_order)
         
         log_action(
             db=db,
@@ -83,22 +110,25 @@ def create_invoice(
             username=current_user.username,
             action="CREATE",
             module="Invoice",
-            record_id="manual",
+            record_id=invoice_number,
             record_type="Invoice",
             changes=invoice_data
         )
         
         return {
-            "id": 999,
-            "invoice_number": f"INV-MANUAL-{datetime.now().strftime('%Y%m%d%H%M%S')}",
-            "customer_name": invoice_data.get("customer_name"),
+            "id": new_order.id,
+            "invoice_number": invoice_number,
+            "order_id": order_id,
+            "customer_name": new_order.customer_name,
             "customer_email": invoice_data.get("customer_email"),
-            "total_amount": 0,
-            "status": "PENDING",
-            "created_at": datetime.now(),
-            "message": "Manual invoice created successfully"
+            "total_amount": new_order.total_amount,
+            "status": "PAID" if invoice_data.get("status") == "PAID" else "PENDING",
+            "payment_status": invoice_data.get("status", "PENDING"),
+            "created_at": new_order.created_at,
+            "message": "Invoice created successfully"
         }
     except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
 

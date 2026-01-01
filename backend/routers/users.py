@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 import models
 import schemas
@@ -6,6 +6,9 @@ import crud
 import auth
 from database import get_db
 from typing import List
+import os
+from pathlib import Path
+import uuid
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
@@ -134,7 +137,7 @@ def delete_user(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_permission("manage_employees"))
 ):
-    """Delete a user"""
+    """Soft delete a user by setting is_active to False"""
     # Prevent self-deletion
     if user_id == current_user.id:
         raise HTTPException(status_code=400, detail="Cannot delete your own account")
@@ -143,6 +146,36 @@ def delete_user(
     if not db_user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    db.delete(db_user)
+    # Soft delete - just mark as inactive instead of deleting
+    db_user.is_active = False
     db.commit()
-    return {"message": "User deleted successfully"}
+    db.refresh(db_user)
+    
+    return {"message": "User deactivated successfully"}
+
+
+@router.post("/upload-photo")
+async def upload_employee_photo(
+    file: UploadFile = File(...),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    """Upload employee photograph"""
+    # Create uploads directory if it doesn't exist
+    upload_dir = Path("uploads/employees")
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Generate unique filename
+    file_extension = os.path.splitext(file.filename)[1]
+    unique_filename = f"{uuid.uuid4()}{file_extension}"
+    file_path = upload_dir / unique_filename
+    
+    # Save file
+    with open(file_path, "wb") as buffer:
+        content = await file.read()
+        buffer.write(content)
+    
+    # Return the path that can be used in the frontend
+    return {
+        "file_path": f"/uploads/employees/{unique_filename}",
+        "url": f"http://localhost:8000/uploads/employees/{unique_filename}"
+    }

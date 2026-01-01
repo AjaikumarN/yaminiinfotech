@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import ReceptionNav from './ReceptionNav';
+import FixedFooter from '../FixedFooter';
 
 const ReceptionLayout = () => {
   const [menuOpen, setMenuOpen] = useState(true);
@@ -67,6 +68,7 @@ const ReceptionLayout = () => {
           }
         }
       `}</style>
+      <FixedFooter />
     </div>
   );
 };

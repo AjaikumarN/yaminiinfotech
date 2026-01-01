@@ -51,8 +51,6 @@ export default function Attendance() {
       });
       
       console.log('Camera stream obtained:', mediaStream);
-      console.log('Video tracks:', mediaStream.getVideoTracks());
-      
       setStream(mediaStream);
       setUseCamera(true);
       
@@ -73,7 +71,7 @@ export default function Attendance() {
       }, 100);
     } catch (error) {
       console.error('Failed to access camera:', error);
-      alert('❌ Could not access camera. Please check permissions or use Upload Photo option.');
+      alert('❌ Unable to access camera. Please check permissions or use Upload Photo option.');
     }
   };
 
@@ -120,18 +118,41 @@ export default function Attendance() {
   const reverseGeocode = async (lat, lon) => {
     try {
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1&zoom=18`,
+        {
+          headers: {
+            'User-Agent': 'YaminiInfotech/1.0'
+          }
+        }
       );
       const data = await response.json();
       
-      // Extract meaningful location (area/city)
-      const city = data.address?.city || data.address?.town || data.address?.village || '';
-      const area = data.address?.suburb || data.address?.neighbourhood || '';
-      const state = data.address?.state || '';
+      // Extract detailed location components
+      const addr = data.address || {};
+      const parts = [];
       
-      // Format as "Area, City, State"
-      const parts = [area, city, state].filter(Boolean);
-      return parts.join(', ') || 'Location detected';
+      // Add area/colony/suburb/neighbourhood
+      if (addr.suburb || addr.neighbourhood || addr.quarter) {
+        parts.push(addr.suburb || addr.neighbourhood || addr.quarter);
+      }
+      
+      // Add road/street
+      if (addr.road) {
+        parts.push(addr.road);
+      }
+      
+      // Add city/town/village
+      if (addr.city || addr.town || addr.village) {
+        parts.push(addr.city || addr.town || addr.village);
+      }
+      
+      // Add state
+      if (addr.state) {
+        parts.push(addr.state);
+      }
+      
+      // Return formatted address or fallback
+      return parts.length > 0 ? parts.join(', ') : data.display_name || 'Location detected';
     } catch (error) {
       console.error('Reverse geocoding failed:', error);
       return `${lat.toFixed(4)}, ${lon.toFixed(4)}`; // Fallback to coordinates
@@ -149,33 +170,38 @@ export default function Attendance() {
     setSubmitting(true);
 
     try {
-      // Get GPS location
-      const position = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(
-          resolve,
-          (error) => {
-            // Graceful fallback if GPS permission denied
-            if (error.code === error.PERMISSION_DENIED) {
-              alert('Location permission denied. Please enable location access or enter manually.');
-            }
-            reject(error);
-          },
-          { enableHighAccuracy: true, timeout: 10000 }
-        );
-      });
+      // Try to get GPS location, but don't fail if unavailable
+      let lat = null;
+      let lon = null;
+      let locationName = 'Location unavailable';
 
-      const lat = position.coords.latitude;
-      const lon = position.coords.longitude;
+      try {
+        const position = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(
+            resolve,
+            reject,
+            { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 }
+          );
+        });
 
-      // Get readable location name (city/area)
-      const locationName = await reverseGeocode(lat, lon);
+        lat = position.coords.latitude;
+        lon = position.coords.longitude;
+
+        // Get readable location name (city/area)
+        locationName = await reverseGeocode(lat, lon);
+      } catch (gpsError) {
+        console.warn('GPS location unavailable:', gpsError);
+        // Continue with attendance marking even without location
+      }
 
       const formData = new FormData();
       formData.append('photo', photo);
-      formData.append('latitude', lat);
-      formData.append('longitude', lon);
+      if (lat !== null && lon !== null) {
+        formData.append('latitude', lat);
+        formData.append('longitude', lon);
+      }
       formData.append('location', locationName);
-      formData.append('time', new Date().toLocaleTimeString('en-US', { hour12: false }));
+      formData.append('time', new Date().toISOString());
       formData.append('attendance_status', 'Present');
 
       await markAttendance(formData);
@@ -293,11 +319,18 @@ export default function Attendance() {
                 ref={videoRef}
                 autoPlay
                 playsInline
+                muted
+                onLoadedMetadata={(e) => {
+                  console.log('Video element metadata loaded');
+                  e.target.play().catch(err => console.error('Play failed:', err));
+                }}
                 style={{
                   width: '100%',
                   maxWidth: '400px',
                   borderRadius: '8px',
                   border: '2px solid #E5E7EB',
+                  background: '#000',
+                  objectFit: 'cover',
                   display: 'block',
                   marginBottom: '12px'
                 }}

@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import AdminSidebar from './AdminSidebar';
+import AdminEmployeesPanel from '../components/AdminEmployeesPanel';
+import AdminErrorBoundary from '../components/AdminErrorBoundary';
+import FixedFooter from '../../components/FixedFooter';
 import { theme } from '../styles/designSystem';
 import '../styles/admin.css';
 import '../styles/animations.css';
@@ -18,6 +21,7 @@ export default function AdminLayout() {
   const navigate = useNavigate();
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [showEmployeesPanel, setShowEmployeesPanel] = useState(false);
 
   // Enforce admin-only access
   useEffect(() => {
@@ -39,8 +43,18 @@ export default function AdminLayout() {
       setSidebarOpen(prev => !prev);
     };
     
+    const handleShowEmployees = () => setShowEmployeesPanel(true);
+    const handleHideEmployees = () => setShowEmployeesPanel(false);
+
     window.addEventListener('toggleAdminMenu', handleToggle);
-    return () => window.removeEventListener('toggleAdminMenu', handleToggle);
+    window.addEventListener('showEmployeesPanel', handleShowEmployees);
+    window.addEventListener('hideEmployeesPanel', handleHideEmployees);
+
+    return () => {
+      window.removeEventListener('toggleAdminMenu', handleToggle);
+      window.removeEventListener('showEmployeesPanel', handleShowEmployees);
+      window.removeEventListener('hideEmployeesPanel', handleHideEmployees);
+    };
   }, []);
 
   if (!isAuthenticated || user?.role !== 'ADMIN') {
@@ -79,17 +93,26 @@ export default function AdminLayout() {
     margin: '0 auto'
   };
 
+  console.log('AdminLayout render', { sidebarOpen, showEmployeesPanel, windowWidth });
+
   return (
-    <div style={layoutStyles}>
-      {/* Sidebar - auto-hidden on mobile */}
-      {showSidebar && <AdminSidebar isCompact={isTablet} onClose={() => setSidebarOpen(false)} />}
-      
-      {/* Main Content Area */}
-      <main style={mainStyles}>
-        <div style={contentContainerStyles}>
-          <Outlet />
-        </div>
-      </main>
-    </div>
+    <AdminErrorBoundary>
+      <div style={layoutStyles}>
+        {/* Sidebar - auto-hidden on mobile */}
+        {showSidebar && <AdminSidebar isCompact={isTablet} onClose={() => setSidebarOpen(false)} />}
+        
+        {/* Main Content Area */}
+        <main style={mainStyles}>
+          <div style={contentContainerStyles}>
+            {showEmployeesPanel ? (
+              <AdminEmployeesPanel onClose={() => window.dispatchEvent(new Event('hideEmployeesPanel'))} />
+            ) : (
+              <Outlet />
+            )}
+          </div>
+        </main>
+        <FixedFooter />
+      </div>
+    </AdminErrorBoundary>
   );
 }

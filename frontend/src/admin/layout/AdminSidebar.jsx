@@ -1,77 +1,99 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 import { theme } from '../styles/designSystem';
+
+/**
+ * Material Icon Component
+ */
+const MaterialIcon = ({ name, style = {} }) => (
+  <span 
+    className="material-icons" 
+    style={{ 
+      fontSize: '20px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      ...style 
+    }}
+  >
+    {name}
+  </span>
+);
 
 /**
  * AdminSidebar - Enterprise Navigation Sidebar
  * Always visible on desktop/tablet, hidden on mobile
  * Compact mode for tablets (narrower with space efficiency)
  */
-export default function AdminSidebar({ isCompact = false, onClose }) {
+export default function AdminSidebar({ isCompact: initialCompact = false, onClose }) {
   const location = useLocation();
+  const { user } = useAuth();
+  const [isCompact, setIsCompact] = useState(initialCompact);
   const sections = [
     {
       title: 'Overview',
       items: [
-        { icon: '📊', label: 'Dashboard', path: '/admin/dashboard' }
+        { icon: 'dashboard', label: 'Dashboard', path: '/admin/dashboard' }
       ]
     },
     {
       title: 'Employees',
       items: [
-        { icon: '👥', label: 'All Employees', path: '/admin/employees/salesmen' },
-        { icon: '👔', label: 'Salesmen', path: '/admin/employees/salesmen' },
-        { icon: '🔧', label: 'Engineers', path: '/admin/employees/engineers' },
-        { icon: '🏢', label: 'Reception', path: '/admin/employees/reception' }
+        { icon: 'groups', label: 'All Employees', path: '/admin/employees/salesmen' },
+        { icon: 'badge', label: 'Salesmen', path: '/admin/employees/salesmen' },
+        { icon: 'engineering', label: 'Engineers', path: '/admin/employees/engineers' },
+        { icon: 'domain', label: 'Reception', path: '/admin/employees/reception' }
       ]
     },
     {
       title: 'Inventory',
       items: [
-        { icon: '📦', label: 'Products', path: '/admin/products' },
-        { icon: '📊', label: 'Stock', path: '/admin/stock' }
+        { icon: 'inventory_2', label: 'Products', path: '/admin/products' },
+        { icon: 'warehouse', label: 'Stock', path: '/admin/stock' }
       ]
     },
     {
       title: 'Sales',
       items: [
-        { icon: '📋', label: 'Enquiries', path: '/admin/enquiries' },
-        { icon: '🛒', label: 'Orders', path: '/admin/orders' }
+        { icon: 'assignment', label: 'Enquiries', path: '/admin/enquiries' },
+        { icon: 'shopping_cart', label: 'Orders', path: '/admin/orders' }
       ]
     },
     {
       title: 'Finance',
       items: [
-        { icon: '💰', label: 'Invoices', path: '/admin/invoices' },
-        { icon: '💳', label: 'Outstanding', path: '/admin/outstanding' }
+        { icon: 'receipt', label: 'Invoices', path: '/admin/invoices' },
+        { icon: 'account_balance', label: 'Outstanding', path: '/admin/outstanding' }
       ]
     },
     {
       title: 'Service',
       items: [
-        { icon: '🛠', label: 'Requests', path: '/admin/service/requests' },
-        { icon: '⏱️', label: 'SLA Monitor', path: '/admin/service/sla' },
-        { icon: '📋', label: 'MIF', path: '/admin/service/mif' }
+        { icon: 'build', label: 'Requests', path: '/admin/service/requests' },
+        { icon: 'schedule', label: 'SLA Monitor', path: '/admin/service/sla' },
+        { icon: 'description', label: 'MIF', path: '/admin/service/mif' }
       ]
     },
     {
       title: 'Operations',
       items: [
-        { icon: '🕐', label: 'Attendance', path: '/admin/attendance' }
+        { icon: 'access_time', label: 'Attendance', path: '/admin/attendance' }
       ]
     },
     {
       title: 'Insights',
       items: [
-        { icon: '📈', label: 'Analytics', path: '/admin/analytics' }
+        { icon: 'analytics', label: 'Analytics', path: '/admin/analytics' }
       ]
     },
     {
       title: 'System',
       items: [
-        { icon: '🧾', label: 'Audit Logs', path: '/admin/audit-logs' },
-        { icon: '👤', label: 'New Employee', path: '/admin/new-employee' },
-        { icon: '⚙️', label: 'Settings', path: '/admin/settings' }
+        { icon: 'history', label: 'Audit Logs', path: '/admin/audit-logs' },
+        { icon: 'person_add', label: 'New Employee', path: '/admin/new-employee' },
+        { icon: 'people', label: 'View Employees', action: 'viewEmployees' },
+        { icon: 'settings', label: 'Settings', path: '/admin/settings' }
       ]
     }
   ];
@@ -103,6 +125,12 @@ export default function AdminSidebar({ isCompact = false, onClose }) {
     });
   }, [location.pathname]);
 
+
+  const openEmployeesSection = () => {
+    // Trigger inline panel to show in Admin layout
+    window.dispatchEvent(new Event('showEmployeesPanel'));
+  };
+
   if (!location.pathname.startsWith('/admin')) {
     return null;
   }
@@ -111,138 +139,160 @@ export default function AdminSidebar({ isCompact = false, onClose }) {
     position: 'fixed',
     top: 0,
     left: 0,
-    width: isCompact ? '220px' : theme.layout.sidebarWidth,
+    width: isCompact ? '100px' : '280px',
     height: '100vh',
-    background: 'linear-gradient(180deg, #f8fafc 0%, #f5f7fb 100%)',
-    borderRight: `1px solid ${theme.colors.neutral.border}`,
+    background: 'linear-gradient(180deg, #ffffff 0%, #f8f9fa 100%)',
+    borderRight: '1px solid #e5e7eb',
     zIndex: theme.zIndex.sidebar,
-    overflow: 'auto',
-    boxShadow: '0 20px 38px rgba(15,23,42,0.08)',
-    transition: theme.transitions.normal
+    overflow: isCompact ? 'hidden' : 'auto',
+    boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)',
+    transition: 'all 0.3s ease'
   };
 
   const headerStyles = {
-    padding: isCompact ? theme.spacing.md : theme.spacing.xl,
-    borderBottom: `1px solid ${theme.colors.neutral.border}`,
-    background: 'linear-gradient(135deg, #e0e7ff 0%, #e5e7eb 100%)'
-  };
-
-  const logoStyles = {
+    padding: isCompact ? '16px 12px' : '20px 16px',
+    borderBottom: '1px solid #e5e7eb',
     display: 'flex',
     alignItems: 'center',
-    gap: isCompact ? theme.spacing.sm : theme.spacing.md
+    justifyContent: 'space-between',
+    gap: '12px',
+    minHeight: '70px'
   };
 
-  const logoIconStyles = {
-    width: isCompact ? '42px' : '52px',
-    height: isCompact ? '42px' : '52px',
-    borderRadius: '14px',
-    background: `linear-gradient(135deg, ${theme.colors.primary.main} 0%, ${theme.colors.primary.dark} 100%)`,
+  const logoBoxStyles = {
+    width: '44px',
+    height: '44px',
+    borderRadius: '50%',
+    background: '#f0f0f0',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: isCompact ? '20px' : '24px',
-    color: theme.colors.neutral.white,
-    boxShadow: '0 12px 24px rgba(59,130,246,0.25)'
+    fontSize: '20px',
+    color: '#0ea5e9',
+    fontWeight: '700',
+    flexShrink: 0,
+    cursor: 'pointer',
+    overflow: 'hidden',
+    border: '2px solid #0ea5e9'
+  };
+  
+  const profileImageStyles = {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover'
+  };
+
+  const logoTextStyles = {
+    flex: 1,
+    minWidth: 0
   };
 
   const logoTitleStyles = {
-    fontSize: isCompact ? theme.typography.fontSize.base : theme.typography.fontSize.lg,
-    fontWeight: theme.typography.fontWeight.bold,
-    color: theme.colors.text.primary,
-    marginBottom: '2px',
-    letterSpacing: '0.2px'
+    fontSize: '16px',
+    fontWeight: '700',
+    color: '#1f2937',
+    margin: '0 0 2px 0',
+    lineHeight: '1.2'
   };
 
-  const logoSubtitleStyles = {
-    fontSize: theme.typography.fontSize.xs,
-    color: theme.colors.text.tertiary,
-    display: isCompact ? 'none' : 'block'
+  const collapseButtonStyles = {
+    width: '40px',
+    height: '40px',
+    borderRadius: '10px',
+    background: '#f0f0f0',
+    border: 'none',
+    color: '#1f2937',
+    fontSize: '18px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'all 0.2s',
+    flexShrink: 0,
+    backdropFilter: 'blur(10px)'
   };
 
   const navStyles = {
-    padding: isCompact ? theme.spacing.sm : theme.spacing.md
+    padding: isCompact ? '8px 8px' : '12px 8px'
   };
 
   const sectionHeaderStyles = {
-    fontSize: theme.typography.fontSize.xs,
-    fontWeight: theme.typography.fontWeight.bold,
-    color: theme.colors.text.tertiary,
+    fontSize: '11px',
+    fontWeight: '700',
+    color: '#9ca3af',
     textTransform: 'uppercase',
     letterSpacing: '0.6px',
-    padding: `${theme.spacing.sm} ${theme.spacing.md}`,
-    marginBottom: theme.spacing.xs,
-    marginTop: theme.spacing.md
+    padding: isCompact ? '0' : '12px 16px',
+    marginBottom: '8px',
+    marginTop: '12px',
+    display: isCompact ? 'none' : 'block'
   };
 
   const getLinkStyles = (isActive) => ({
     display: 'flex',
     alignItems: 'center',
-    gap: isCompact ? theme.spacing.sm : theme.spacing.md,
-    padding: `${theme.spacing.sm} ${theme.spacing.md}`,
-    marginBottom: theme.spacing.xs,
-    borderRadius: theme.borderRadius.lg,
-    fontSize: isCompact ? theme.typography.fontSize.sm : theme.typography.fontSize.base,
-    fontWeight: isActive ? theme.typography.fontWeight.semibold : theme.typography.fontWeight.medium,
-    color: isActive ? theme.colors.primary.main : theme.colors.text.secondary,
-    backgroundColor: isActive ? 'rgba(79,70,229,0.08)' : 'transparent',
+    justifyContent: isCompact ? 'center' : 'flex-start',
+    gap: isCompact ? '0' : '12px',
+    padding: isCompact ? '12px 8px' : '12px 14px',
+    marginBottom: '4px',
+    borderRadius: '10px',
+    fontSize: '14px',
+    fontWeight: isActive ? '600' : '500',
+    color: isActive ? '#0ea5e9' : '#6b7280',
+    backgroundColor: isActive ? 'rgba(14, 165, 233, 0.1)' : 'transparent',
     textDecoration: 'none',
-    transition: theme.transitions.fast,
+    transition: 'all 0.2s ease',
     cursor: 'pointer',
-    border: '1px solid',
-    borderColor: isActive ? 'rgba(79,70,229,0.2)' : 'transparent',
+    border: 'none',
     width: '100%',
-    textAlign: 'left',
+    textAlign: isCompact ? 'center' : 'left',
     position: 'relative'
   });
 
   const iconStyles = {
-    fontSize: isCompact ? '16px' : '18px',
-    width: '20px',
-    textAlign: 'center',
+    fontSize: '20px',
+    width: '24px',
+    height: '24px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
     flexShrink: 0
+  };
+
+  const labelStyles = {
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    display: isCompact ? 'none' : 'block'
   };
 
   return (
     <aside style={sidebarStyles}>
       {/* Header */}
       <div style={headerStyles}>
-        <div style={logoStyles}>
-          <div style={logoIconStyles}>A</div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={logoTitleStyles}>Admin</div>
-          </div>
-          {onClose && (
-            <button
-              onClick={onClose}
-              style={{
-                background: 'rgba(79, 70, 229, 0.15)',
-                border: 'none',
-                color: theme.colors.primary.main,
-                width: '32px',
-                height: '32px',
-                borderRadius: '8px',
-                fontSize: '18px',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: 'bold'
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.background = 'rgba(79, 70, 229, 0.25)';
-                e.target.style.transform = 'scale(1.05)';
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.background = 'rgba(79, 70, 229, 0.15)';
-                e.target.style.transform = 'scale(1)';
-              }}
-            >
-              ✕
-            </button>
+        <div style={logoBoxStyles}>
+          {user?.photo || user?.photograph ? (
+            <img src={user.photo || user.photograph} alt={user.name || user.full_name} style={profileImageStyles} />
+          ) : (
+            <span style={{ fontSize: '24px' }}>👔</span>
           )}
         </div>
+        {!isCompact && (
+          <div style={logoTextStyles}>
+            <div style={logoTitleStyles}>Admin</div>
+          </div>
+        )}
+        <button
+          style={collapseButtonStyles}
+          onClick={() => setIsCompact(!isCompact)}
+          title={isCompact ? 'Expand' : 'Collapse'}
+          onMouseEnter={(e) => e.target.style.background = 'rgba(255, 255, 255, 0.15)'}
+          onMouseLeave={(e) => e.target.style.background = 'rgba(255, 255, 255, 0.1)'}
+        >
+          <span className="material-icons" style={{ fontSize: '20px' }}>
+            {isCompact ? 'chevron_right' : 'chevron_left'}
+          </span>
+        </button>
       </div>
 
       {/* Navigation */}
@@ -281,7 +331,7 @@ export default function AdminSidebar({ isCompact = false, onClose }) {
                 }}
               >
                 <span>{section.title}</span>
-                <span style={{ fontSize: '12px', color: theme.colors.text.tertiary }}>
+                <span style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.5)' }}>
                   {openSections[section.title] ? '▾' : '▸'}
                 </span>
               </button>
@@ -290,14 +340,32 @@ export default function AdminSidebar({ isCompact = false, onClose }) {
                 {section.items.map((item, itemIdx) => {
                   const isActive = isPathActive(item.path);
 
-                  return (
+                  return item.action === 'viewEmployees' ? (
+                    <button
+                      key={itemIdx}
+                      type="button"
+                      onClick={openEmployeesSection}
+                      style={getLinkStyles(false)}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#f3f4f6';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }}
+                    >
+                      <MaterialIcon name={item.icon} />
+                      <span style={labelStyles}>
+                        {item.label}
+                      </span>
+                    </button>
+                  ) : (
                     <NavLink
                       key={itemIdx}
                       to={item.path}
                       style={getLinkStyles(isActive)}
                       onMouseEnter={(e) => {
                         if (!isActive) {
-                          e.currentTarget.style.backgroundColor = theme.colors.neutral.bg;
+                          e.currentTarget.style.backgroundColor = '#f3f4f6';
                         }
                       }}
                       onMouseLeave={(e) => {
@@ -306,32 +374,27 @@ export default function AdminSidebar({ isCompact = false, onClose }) {
                         }
                       }}
                     >
-                      <span style={iconStyles}>{item.icon}</span>
-                      <span style={{ 
-                        overflow: 'hidden', 
-                        textOverflow: 'ellipsis', 
-                        whiteSpace: 'nowrap' 
-                      }}>
+                      <MaterialIcon name={item.icon} />
+                      <span style={labelStyles}>
                         {item.label}
                       </span>
                       
-                      {/* Active indicator */}
+                      {/* Active indicator dot */}
                       {isActive && (
                         <div style={{
                           position: 'absolute',
-                          left: 6,
-                          top: '50%',
-                          transform: 'translateY(-50%)',
-                          width: '4px',
-                          height: '60%',
-                          backgroundColor: theme.colors.primary.main,
-                          borderRadius: '6px'
+                          right: '12px',
+                          width: '6px',
+                          height: '6px',
+                          backgroundColor: '#0ea5e9',
+                          borderRadius: '50%'
                         }} />
                       )}
                     </NavLink>
                   );
                 })}
               </div>
+
             </div>
           );
         })}

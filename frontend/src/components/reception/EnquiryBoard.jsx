@@ -373,15 +373,20 @@ const EnquiryBoard = ({ mode = 'staff' }) => {
           padding: 20px;
           max-width: 1600px;
           margin: 0 auto;
+          height: 100%;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
         }
 
         .page-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          margin-bottom: 30px;
+          margin-bottom: 20px;
           padding-bottom: 20px;
           border-bottom: 2px solid #ecf0f1;
+          flex-shrink: 0;
         }
 
         .page-header h1 {
@@ -406,6 +411,7 @@ const EnquiryBoard = ({ mode = 'staff' }) => {
           flex-wrap: wrap;
           align-items: end;
           box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+          flex-shrink: 0;
         }
 
         .filter-group {
@@ -443,8 +449,10 @@ const EnquiryBoard = ({ mode = 'staff' }) => {
         .data-table-container {
           background: white;
           border-radius: 12px;
-          overflow: hidden;
           box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+          flex: 1;
+          overflow: auto;
+          min-height: 0;
         }
 
         .data-table {

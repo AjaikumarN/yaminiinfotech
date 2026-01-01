@@ -5,6 +5,7 @@ import GlobalSearch from '../components/GlobalSearch';
 import ToastNotification from '../components/ToastNotification';
 import OfflineIndicator from '../components/OfflineIndicator';
 import SalesmanSidebar from '../components/SalesmanSidebar';
+import FixedFooter from '../../components/FixedFooter';
 import '../styles/salesman.css';
 
 /**
@@ -101,6 +102,7 @@ export default function SalesmanLayout() {
           <Outlet />
         </div>
       </main>
+      <FixedFooter />
     </div>
   );
 }

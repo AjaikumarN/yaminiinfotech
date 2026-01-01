@@ -109,9 +109,226 @@ export default function Invoices({ mode = 'staff' }) {
     }
   };
 
-  const handleExport = (invoiceId) => {
-    // Export as PDF or download
-    window.open(`/api/invoices/${invoiceId}/export`, '_blank');
+  const handleExport = async (invoiceId) => {
+    try {
+      // Fetch full invoice details
+      const invoice = await apiRequest(`/api/invoices/${invoiceId}`);
+      generateInvoicePDF(invoice);
+    } catch (error) {
+      console.error('Failed to fetch invoice:', error);
+      alert('Failed to generate invoice PDF');
+    }
+  };
+
+  const generateInvoicePDF = (invoice) => {
+    const items = invoice.items || [];
+    const subtotal = invoice.subtotal || 0;
+    const taxAmount = invoice.tax_amount || 0;
+    const totalAmount = invoice.total_amount || 0;
+    const amountPaid = invoice.amount_paid || 0;
+    const outstanding = totalAmount - amountPaid;
+
+    const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Invoice</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 20mm;
+    }
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 12px;
+      color: #000;
+    }
+    .header {
+      text-align: center;
+      border-bottom: 2px solid #000;
+      padding-bottom: 10px;
+      margin-bottom: 15px;
+    }
+    .company-name {
+      font-size: 18px;
+      font-weight: bold;
+    }
+    .section {
+      margin-bottom: 14px;
+    }
+    .section-title {
+      font-weight: bold;
+      background: #f2f2f2;
+      padding: 6px;
+      border: 1px solid #000;
+      margin-bottom: 6px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th, td {
+      border: 1px solid #000;
+      padding: 6px;
+      text-align: left;
+    }
+    th {
+      background: #fafafa;
+    }
+    .right {
+      text-align: right;
+    }
+    .total-box {
+      font-size: 14px;
+      font-weight: bold;
+    }
+    .footer-note {
+      font-size: 10px;
+      border-top: 1px dashed #000;
+      margin-top: 15px;
+      padding-top: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="company-name">Yamini Infotech</div>
+    <div>Billing & Invoice</div>
+  </div>
+
+  <div class="section">
+    <table>
+      <tr>
+        <td><b>Invoice #</b></td>
+        <td>INV-${invoice.id}</td>
+        <td><b>Invoice Date</b></td>
+        <td>${invoice.created_at ? new Date(invoice.created_at).toLocaleDateString() : 'N/A'}</td>
+      </tr>
+      <tr>
+        <td><b>Status</b></td>
+        <td>${invoice.status || invoice.payment_status || 'PENDING'}</td>
+        <td><b>Payment Mode</b></td>
+        <td>${invoice.payment_mode || 'N/A'}</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Customer Details</div>
+    <table>
+      <tr>
+        <td><b>Customer Name</b></td>
+        <td>${invoice.customer_name || 'N/A'}</td>
+      </tr>
+      <tr>
+        <td><b>Email</b></td>
+        <td>${invoice.customer_email || 'N/A'}</td>
+      </tr>
+      <tr>
+        <td><b>Contact</b></td>
+        <td>${invoice.customer_phone || 'N/A'}</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Invoice Items</div>
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Description</th>
+          <th class="right">Qty</th>
+          <th class="right">Rate</th>
+          <th class="right">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${items.map((item, idx) => `
+        <tr>
+          <td>${idx + 1}</td>
+          <td>${item.description || item.product_name || 'Item'}</td>
+          <td class="right">${item.quantity || 1}</td>
+          <td class="right">₹${parseFloat(item.rate || item.price || 0).toLocaleString()}</td>
+          <td class="right">₹${parseFloat(item.amount || (item.quantity * item.rate) || 0).toLocaleString()}</td>
+        </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <table>
+      <tr>
+        <td class="right"><b>Subtotal</b></td>
+        <td class="right">₹${parseFloat(subtotal).toLocaleString()}</td>
+      </tr>
+      <tr>
+        <td class="right"><b>Tax (GST ${invoice.tax_percent || 18}%)</b></td>
+        <td class="right">₹${parseFloat(taxAmount).toLocaleString()}</td>
+      </tr>
+      <tr>
+        <td class="right total-box">Total Amount</td>
+        <td class="right total-box">₹${parseFloat(totalAmount).toLocaleString()}</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Outstanding Summary</div>
+    <table>
+      <tr>
+        <td><b>Total Invoice Amount</b></td>
+        <td class="right">₹${parseFloat(totalAmount).toLocaleString()}</td>
+      </tr>
+      <tr>
+        <td><b>Amount Paid</b></td>
+        <td class="right">₹${parseFloat(amountPaid).toLocaleString()}</td>
+      </tr>
+      <tr>
+        <td><b>Outstanding Balance</b></td>
+        <td class="right">₹${parseFloat(outstanding).toLocaleString()}</td>
+      </tr>
+    </table>
+  </div>
+
+  ${invoice.notes ? `
+  <div class="section">
+    <div class="section-title">Notes</div>
+    <div style="padding: 8px; border: 1px solid #000;">${invoice.notes}</div>
+  </div>
+  ` : ''}
+
+  <div class="section">
+    <table>
+      <tr>
+        <td height="60">
+          Prepared By (Reception)<br><br>
+          Signature: ___________
+        </td>
+        <td height="60">
+          Authorized By (Admin)<br><br>
+          Signature: ___________
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="footer-note">
+    This is a system‑generated invoice. Please contact the office for any discrepancies.
+  </div>
+</body>
+</html>
+    `;
+
+    const newWindow = window.open('', '_blank');
+    newWindow.document.write(html);
+    newWindow.document.close();
+    
+    setTimeout(() => {
+      newWindow.print();
+    }, 500);
   };
 
   const handleUpdatePaymentStatus = async (invoiceId, newStatus) => {

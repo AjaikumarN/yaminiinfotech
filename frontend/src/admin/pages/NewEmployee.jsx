@@ -1,9 +1,16 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { apiRequest } from '../../utils/api';
+import { FiUser, FiHash, FiBriefcase, FiLock, FiDollarSign, FiEye, FiEyeOff } from 'react-icons/fi';
 
 export default function NewEmployee() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const editId = searchParams.get('id');
+  const isEdit = !!editId;
+
+  console.log('NewEmployee loaded - Search params:', searchParams.toString(), 'Edit ID:', editId, 'Is Edit:', isEdit);
+
   const [formData, setFormData] = useState({
     fullName: '',
     gender: '',
@@ -25,8 +32,71 @@ export default function NewEmployee() {
     accountNumber: ''
   });
 
+  const [originalEmail, setOriginalEmail] = useState('');
+  const [originalUsername, setOriginalUsername] = useState('');
+  const [usernameAvailable, setUsernameAvailable] = useState(null);
+  const [checkingUsername, setCheckingUsername] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    if (isEdit) {
+      (async () => {
+        try {
+          const u = await apiRequest(`/api/users/${editId}`);
+          setOriginalEmail(u.email || '');
+          setOriginalUsername(u.username || '');
+          setFormData(prev => ({
+            ...prev,
+            fullName: u.full_name || prev.fullName,
+            gender: u.gender || prev.gender,
+            dateOfBirth: u.date_of_birth ? u.date_of_birth.split('T')[0] : prev.dateOfBirth,
+            mobileNumber: u.phone || u.mobile || prev.mobileNumber,
+            emailAddress: u.email || prev.emailAddress,
+            currentAddress: u.current_address || u.address || prev.currentAddress,
+            permanentAddress: u.permanent_address || prev.permanentAddress,
+            employeeId: u.employee_id ? String(u.employee_id) : (u.id ? String(u.id) : prev.employeeId),
+            nationality: u.nationality || prev.nationality,
+            department: u.department || prev.department,
+            role: u.role || prev.role,
+            dateOfJoining: u.date_of_joining ? u.date_of_joining.split('T')[0] : (u.created_at ? u.created_at.split('T')[0] : prev.dateOfJoining),
+            username: u.username || prev.username,
+            salary: u.salary || u.monthly_pay || prev.salary,
+            bankName: u.bank_name || u.bank || prev.bankName,
+            accountNumber: u.account_number || u.bank_account || prev.accountNumber
+          }));
+        } catch (err) {
+          console.error('Failed to fetch user for edit', err);
+        }
+      })();
+    }
+  }, [isEdit, editId]);
+
   const [loading, setLoading] = useState(false);
   const [sameAsCurrentAddress, setSameAsCurrentAddress] = useState(false);
+
+  // Check username availability with debounce
+  useEffect(() => {
+    if (!formData.username || isEdit) {
+      setUsernameAvailable(null);
+      return;
+    }
+
+    const timeoutId = setTimeout(async () => {
+      setCheckingUsername(true);
+      try {
+        const users = await apiRequest('/api/users/');
+        const exists = users.some(u => u.username === formData.username);
+        setUsernameAvailable(!exists);
+      } catch (error) {
+        console.error('Failed to check username:', error);
+        setUsernameAvailable(null);
+      } finally {
+        setCheckingUsername(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [formData.username, isEdit]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -47,16 +117,165 @@ export default function NewEmployee() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    
+    console.log('Edit mode:', isEdit, 'Edit ID:', editId);
+    console.log('Username comparison:', formData.username, '!==', originalUsername);
+    
     try {
-      await apiRequest('/api/users/', {
-        method: 'POST',
-        body: JSON.stringify(formData)
-      });
-      alert('Employee created successfully!');
-      navigate('/admin/employees/salesmen');
+      if (isEdit) {
+        // First, upload photo if provided
+        let photographPath = undefined;
+        if (formData.photograph && formData.photograph instanceof File) {
+          const photoFormData = new FormData();
+          photoFormData.append('file', formData.photograph);
+          
+          try {
+            // Get token from yamini_user object
+            const user = JSON.parse(localStorage.getItem('yamini_user') || '{}');
+            const token = user.token;
+            
+            const uploadResponse = await fetch('http://localhost:8000/api/users/upload-photo', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${token}`
+              },
+              body: photoFormData
+            });
+            if (uploadResponse.ok) {
+              const uploadData = await uploadResponse.json();
+              photographPath = uploadData.url;
+            } else {
+              console.error('Photo upload failed:', await uploadResponse.text());
+            }
+          } catch (uploadErr) {
+            console.error('Photo upload failed:', uploadErr);
+          }
+        }
+
+        // Map to backend expected fields - now including ALL fields
+        const payload = {
+          full_name: formData.fullName,
+          role: formData.role,
+          department: formData.department,
+          // Only include email/username if they changed
+          ...(formData.emailAddress !== originalEmail ? { email: formData.emailAddress } : {}),
+          ...(formData.username !== originalUsername ? { username: formData.username } : {}),
+          // Personal Information
+          gender: formData.gender || undefined,
+          date_of_birth: formData.dateOfBirth || undefined,
+          phone: formData.mobileNumber || undefined,
+          mobile: formData.mobileNumber || undefined,
+          current_address: formData.currentAddress || undefined,
+          permanent_address: formData.permanentAddress || undefined,
+          // Identification / KYC
+          employee_id: formData.employeeId ? String(formData.employeeId) : undefined,
+          nationality: formData.nationality || undefined,
+          photograph: photographPath,
+          // Employment Details
+          date_of_joining: formData.dateOfJoining || undefined,
+          // Salary & Payroll
+          salary: formData.salary ? parseFloat(formData.salary) : undefined,
+          monthly_pay: formData.salary ? parseFloat(formData.salary) : undefined,
+          bank_name: formData.bankName || undefined,
+          bank: formData.bankName || undefined,
+          account_number: formData.accountNumber || undefined,
+          bank_account: formData.accountNumber || undefined,
+          // Only send password if changed
+          ...(formData.password ? { password: formData.password } : {})
+        };
+
+        // Remove undefined values to avoid validation errors
+        Object.keys(payload).forEach(key => {
+          if (payload[key] === undefined) {
+            delete payload[key];
+          }
+        });
+
+        await apiRequest(`/api/users/${editId}`, {
+          method: 'PUT',
+          body: JSON.stringify(payload)
+        });
+
+        alert('Employee updated successfully!');
+        // Navigate to the employee's detail view
+        const roleSegment = (formData.role || '').toUpperCase() === 'SERVICE_ENGINEER' ? 'engineers' : (formData.role || '').toUpperCase() === 'SALESMAN' ? 'salesmen' : (formData.role || '').toLowerCase();
+        navigate(`/admin/employees/${roleSegment}/${editId}`);
+      } else {
+        // First, upload photo if provided
+        let photographPath = undefined;
+        if (formData.photograph && formData.photograph instanceof File) {
+          const photoFormData = new FormData();
+          photoFormData.append('file', formData.photograph);
+          
+          try {
+            // Get token from yamini_user object
+            const user = JSON.parse(localStorage.getItem('yamini_user') || '{}');
+            const token = user.token;
+            
+            const uploadResponse = await fetch('http://localhost:8000/api/users/upload-photo', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${token}`
+              },
+              body: photoFormData
+            });
+            if (uploadResponse.ok) {
+              const uploadData = await uploadResponse.json();
+              photographPath = uploadData.url;
+            } else {
+              console.error('Photo upload failed:', await uploadResponse.text());
+            }
+          } catch (uploadErr) {
+            console.error('Photo upload failed:', uploadErr);
+          }
+        }
+
+        // For new employee, map all fields
+        const payload = {
+          username: formData.username,
+          email: formData.emailAddress,
+          full_name: formData.fullName,
+          role: formData.role,
+          department: formData.department,
+          password: formData.password,
+          // Personal Information
+          gender: formData.gender || undefined,
+          date_of_birth: formData.dateOfBirth || undefined,
+          phone: formData.mobileNumber || undefined,
+          mobile: formData.mobileNumber || undefined,
+          current_address: formData.currentAddress || undefined,
+          permanent_address: formData.permanentAddress || undefined,
+          // Identification / KYC
+          nationality: formData.nationality || undefined,
+          photograph: photographPath,
+          // Employment Details
+          date_of_joining: formData.dateOfJoining || undefined,
+          // Salary & Payroll
+          salary: formData.salary ? parseFloat(formData.salary) : undefined,
+          monthly_pay: formData.salary ? parseFloat(formData.salary) : undefined,
+          bank_name: formData.bankName || undefined,
+          bank: formData.bankName || undefined,
+          account_number: formData.accountNumber || undefined,
+          bank_account: formData.accountNumber || undefined
+        };
+        
+        // Remove undefined values to avoid validation errors
+        Object.keys(payload).forEach(key => {
+          if (payload[key] === undefined) {
+            delete payload[key];
+          }
+        });
+        
+        await apiRequest('/api/users/', {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
+        alert('Employee created successfully!');
+        navigate('/admin/employees/salesmen');
+      }
     } catch (error) {
-      console.error('Failed to create employee:', error);
-      alert('Failed to create employee');
+      console.error('Failed to save employee:', error);
+      alert('Failed to save employee');
     } finally {
       setLoading(false);
     }
@@ -65,23 +284,23 @@ export default function NewEmployee() {
   const sectionStyle = {
     background: 'white',
     borderRadius: '12px',
-    padding: '24px',
-    marginBottom: '24px',
-    border: '1px solid #e5e7eb',
-    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)'
+    padding: '18px',
+    marginBottom: '28px',
+    border: '1px solid #e6eef0',
+    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
   };
 
   const headerStyle = {
     display: 'flex',
     alignItems: 'center',
     gap: '12px',
-    marginBottom: '20px',
-    paddingBottom: '16px',
-    borderBottom: '2px solid #f3f4f6'
+    marginBottom: '18px',
+    paddingBottom: '12px',
+    borderBottom: '1px solid #eef2f7'
   };
 
   const titleStyle = {
-    fontSize: '18px',
+    fontSize: '20px',
     fontWeight: '700',
     color: '#1f2937',
     margin: 0
@@ -90,18 +309,18 @@ export default function NewEmployee() {
   const gridStyle = {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-    gap: '20px'
+    gap: '24px'
   };
 
   const fieldStyle = {
     display: 'flex',
     flexDirection: 'column',
-    gap: '8px'
+    gap: '10px'
   };
 
   const labelStyle = {
     fontSize: '13px',
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#374151'
   };
 
@@ -121,32 +340,59 @@ export default function NewEmployee() {
     fontSize: '15px',
     fontWeight: '600',
     cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
     transition: 'all 0.2s'
   };
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-      {/* Page Header */}
+    <div style={{ maxWidth: '1200px', margin: '0 auto', paddingBottom: '40px' }}>
+      {/* Page Header with Action Info */}
       <div style={{
-        background: 'linear-gradient(135deg, #667EEA 0%, #764BA2 100%)',
+        background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
         borderRadius: '16px',
         padding: '32px',
         marginBottom: '32px',
-        color: 'white'
+        color: 'white',
+        boxShadow: '0 8px 24px rgba(99, 102, 241, 0.25)'
       }}>
-        <h1 style={{ fontSize: '32px', fontWeight: '800', margin: 0, marginBottom: '8px' }}>
-          👤 New Employee
-        </h1>
-        <p style={{ fontSize: '16px', opacity: 0.9, margin: 0 }}>
-          Add a new team member to the system
-        </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px' }}>
+          <span className="material-icons" style={{ fontSize: '40px' }}>
+            {isEdit ? 'edit' : 'person_add'}
+          </span>
+          <div>
+            <h1 style={{ fontSize: '32px', fontWeight: '800', margin: 0, marginBottom: '8px' }}>
+              {isEdit ? 'Edit Employee' : 'Create New Employee'}
+            </h1>
+            <p style={{ fontSize: '16px', opacity: 0.95, margin: 0, fontWeight: '500' }}>
+              {isEdit ? 'Update employee information and credentials' : 'Fill in the form below to add a new employee to the system'}
+            </p>
+          </div>
+        </div>
+        {!isEdit && (
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.15)',
+            borderRadius: '8px',
+            padding: '12px 16px',
+            marginTop: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px'
+          }}>
+            <span className="material-icons" style={{ fontSize: '20px' }}>info</span>
+            <span style={{ fontSize: '14px', fontWeight: '500' }}>
+              All fields marked with * are required. The employee will receive login credentials after creation.
+            </span>
+          </div>
+        )}
       </div>
 
       <form onSubmit={handleSubmit}>
         {/* 1. Personal Information */}
         <div style={sectionStyle}>
           <div style={headerStyle}>
-            <span style={{ fontSize: '24px' }}>👤</span>
+            <FiUser style={{ fontSize: 20, color: '#06B6D4' }} />
             <h2 style={titleStyle}>1. Personal Information</h2>
           </div>
           <div style={gridStyle}>
@@ -269,7 +515,7 @@ export default function NewEmployee() {
         {/* 2. Identification / KYC Details */}
         <div style={sectionStyle}>
           <div style={headerStyle}>
-            <span style={{ fontSize: '24px' }}>🆔</span>
+            <FiHash style={{ fontSize: 20, color: '#06B6D4' }} />
             <h2 style={titleStyle}>2. Identification / KYC Details</h2>
           </div>
           <div style={gridStyle}>
@@ -314,7 +560,7 @@ export default function NewEmployee() {
         {/* 3. Employment Details */}
         <div style={sectionStyle}>
           <div style={headerStyle}>
-            <span style={{ fontSize: '24px' }}>💼</span>
+            <FiBriefcase style={{ fontSize: 20, color: '#06B6D4' }} />
             <h2 style={titleStyle}>3. Employment Details</h2>
           </div>
           <div style={gridStyle}>
@@ -373,7 +619,7 @@ export default function NewEmployee() {
         {/* 4. Account & System Access */}
         <div style={sectionStyle}>
           <div style={headerStyle}>
-            <span style={{ fontSize: '24px' }}>🔐</span>
+            <FiLock style={{ fontSize: 20, color: '#06B6D4' }} />
             <h2 style={titleStyle}>4. Account & System Access</h2>
           </div>
           <div style={gridStyle}>
@@ -385,33 +631,76 @@ export default function NewEmployee() {
                 value={formData.username}
                 onChange={handleChange}
                 required
-                style={inputStyle}
+                style={{
+                  ...inputStyle,
+                  borderColor: usernameAvailable === false ? '#ef4444' : usernameAvailable === true ? '#10b981' : '#d1d5db'
+                }}
                 placeholder="Enter username"
-                onFocus={(e) => e.target.style.borderColor = '#667EEA'}
-                onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+                onFocus={(e) => e.target.style.borderColor = usernameAvailable === false ? '#ef4444' : usernameAvailable === true ? '#10b981' : '#667EEA'}
+                onBlur={(e) => e.target.style.borderColor = usernameAvailable === false ? '#ef4444' : usernameAvailable === true ? '#10b981' : '#d1d5db'}
               />
+              {!isEdit && formData.username && (
+                <div style={{ marginTop: '6px', fontSize: '13px' }}>
+                  {checkingUsername ? (
+                    <span style={{ color: '#6b7280' }}>⏳ Checking availability...</span>
+                  ) : usernameAvailable === true ? (
+                    <span style={{ color: '#10b981' }}>✓ Username is available</span>
+                  ) : usernameAvailable === false ? (
+                    <span style={{ color: '#ef4444' }}>✗ Username already exists. Please choose another.</span>
+                  ) : null}
+                </div>
+              )}
             </div>
-            <div style={fieldStyle}>
-              <label style={labelStyle}>Password *</label>
-              <input
-                type="password"
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                required
-                style={inputStyle}
-                placeholder="Enter password"
-                onFocus={(e) => e.target.style.borderColor = '#667EEA'}
-                onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
-              />
-            </div>
+            {!isEdit ? (
+              <div style={fieldStyle}>
+                <label style={labelStyle}>Password *</label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    name="password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    required
+                    style={{...inputStyle, paddingRight: '40px'}}
+                    placeholder="Enter password"
+                    onFocus={(e) => e.target.style.borderColor = '#06B6D4'}
+                    onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    style={{
+                      position: 'absolute',
+                      right: '10px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: '#6b7280',
+                      padding: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    {showPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div style={fieldStyle}>
+                <label style={labelStyle}>Password</label>
+                <div style={{ color: '#6b7280' }}>Password is not editable in edit mode</div>
+              </div>
+            )}
           </div>
         </div>
 
         {/* 5. Salary & Payroll Information */}
         <div style={sectionStyle}>
           <div style={headerStyle}>
-            <span style={{ fontSize: '24px' }}>💰</span>
+            <FiDollarSign style={{ fontSize: 20, color: '#06B6D4' }} />
             <h2 style={titleStyle}>5. Salary & Payroll Information</h2>
           </div>
           <div style={gridStyle}>
@@ -461,7 +750,14 @@ export default function NewEmployee() {
         </div>
 
         {/* Action Buttons */}
-        <div style={{ display: 'flex', gap: '16px', justifyContent: 'flex-end', marginTop: '32px' }}>
+        <div style={{
+          display: 'flex',
+          gap: '16px',
+          justifyContent: 'flex-end',
+          marginTop: '40px',
+          paddingTop: '24px',
+          borderTop: '2px solid #e5e7eb'
+        }}>
           <button
             type="button"
             onClick={() => navigate(-1)}
@@ -469,11 +765,19 @@ export default function NewEmployee() {
               ...buttonStyle,
               background: 'white',
               color: '#6b7280',
-              border: '1px solid #d1d5db'
+              border: '2px solid #d1d5db',
+              fontWeight: '600'
             }}
-            onMouseEnter={(e) => e.target.style.background = '#f9fafb'}
-            onMouseLeave={(e) => e.target.style.background = 'white'}
+            onMouseEnter={(e) => {
+              e.target.style.background = '#f9fafb';
+              e.target.style.borderColor = '#9ca3af';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.background = 'white';
+              e.target.style.borderColor = '#d1d5db';
+            }}
           >
+            <span className="material-icons" style={{ fontSize: '18px', marginRight: '8px' }}>close</span>
             Cancel
           </button>
           <button
@@ -481,13 +785,30 @@ export default function NewEmployee() {
             disabled={loading}
             style={{
               ...buttonStyle,
-              background: 'linear-gradient(135deg, #667EEA 0%, #764BA2 100%)',
-              color: 'white'
+              background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+              color: 'white',
+              fontWeight: '700',
+              fontSize: '16px',
+              padding: '14px 32px',
+              boxShadow: '0 4px 12px rgba(99, 102, 241, 0.3)',
+              border: 'none',
+              opacity: loading ? 0.6 : 1,
+              cursor: loading ? 'not-allowed' : 'pointer'
             }}
-            onMouseEnter={(e) => e.target.style.opacity = '0.9'}
-            onMouseLeave={(e) => e.target.style.opacity = '1'}
+            onMouseEnter={(e) => !loading && (e.target.style.transform = 'translateY(-2px)', e.target.style.boxShadow = '0 6px 16px rgba(99, 102, 241, 0.4)')}
+            onMouseLeave={(e) => !loading && (e.target.style.transform = 'translateY(0)', e.target.style.boxShadow = '0 4px 12px rgba(99, 102, 241, 0.3)')}
           >
-            {loading ? 'Creating...' : 'Create Employee'}
+            {loading ? (
+              <>
+                <span className="material-icons" style={{ fontSize: '18px', marginRight: '8px', animation: 'spin 1s linear infinite' }}>refresh</span>
+                {isEdit ? 'Saving...' : 'Creating...'}
+              </>
+            ) : (
+              <>
+                <span className="material-icons" style={{ fontSize: '18px', marginRight: '8px' }}>{isEdit ? 'save' : 'person_add'}</span>
+                {isEdit ? 'Save Changes' : 'Create Employee'}
+              </>
+            )}
           </button>
         </div>
       </form>

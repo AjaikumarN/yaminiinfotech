@@ -348,7 +348,7 @@ export default function Attendance() {
                         <td style={cardStyles.td}>
                           {record.photo_path ? (
                             <button
-                              onClick={() => window.open(`/${record.photo_path}`, '_blank')}
+                              onClick={() => window.open(`/uploads/attendance/${record.photo_path}`, '_blank')}
                               style={{
                                 color: '#4338ca',
                                 fontWeight: 700,
@@ -451,7 +451,7 @@ export default function Attendance() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {record.photo_path && (
                       <button
-                        onClick={() => window.open(`/${record.photo_path}`, '_blank')}
+                        onClick={() => window.open(`/uploads/attendance/${record.photo_path}`, '_blank')}
                         style={{
                           width: '100%',
                           padding: '10px',

@@ -3,7 +3,16 @@
 html, body, #root { height: 100%; }
 body { margin: 0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color: var(--text); background: #ffffff; }
 
-.app { min-height: 100%; display: flex; flex-direction: column; }
+/* ❌ REMOVED: display: flex; flex-direction: column; from .app */
+/* These caused layout conflicts with dashboard layouts */
+.app { min-height: 100vh; }
+
+/* Public layout uses flex (only for public pages) */
+.app.public-layout { display: flex; flex-direction: column; }
+
+/* Dashboard layout uses fixed height (no flex) */
+.app.dashboard-mode { height: 100vh; overflow: hidden; }
+
 .content { flex: 1; }
 
 /* Header */

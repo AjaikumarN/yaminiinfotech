@@ -20,6 +20,14 @@ def create_enquiry(
     # Determine who created the enquiry
     created_by_name = current_user.full_name if current_user else "Website Visitor"
     
+    # Auto-assign to salesman if they created it
+    if current_user and current_user.role == models.UserRole.SALESMAN:
+        # Convert to dict to modify
+        enquiry_dict = enquiry.dict()
+        enquiry_dict['assigned_to'] = current_user.id
+        # Create new schema object with assigned_to
+        enquiry = schemas.EnquiryCreate(**enquiry_dict)
+    
     # Create enquiry
     new_enquiry = crud.create_enquiry(db=db, enquiry=enquiry, created_by=created_by_name)
     

@@ -3,6 +3,7 @@ import { getMyEnquiries, updateEnquiry } from '../hooks/useSalesmanApi';
 import EmptyState from '../components/EmptyState';
 import ExportButtons from '../components/ExportButtons';
 import { showToast } from '../components/ToastNotification';
+import { apiRequest } from '../../utils/api';
 import '../styles/salesman.css';
 
 /**
@@ -14,6 +15,16 @@ export default function Enquiries() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newEnquiry, setNewEnquiry] = useState({
+    customer_name: '',
+    phone: '',
+    email: '',
+    product_interest: '',
+    source: 'field_visit',
+    priority: 'WARM',
+    notes: ''
+  });
 
   useEffect(() => {
     loadEnquiries();
@@ -64,6 +75,38 @@ export default function Enquiries() {
     }
   };
 
+  const handleCreateEnquiry = async (e) => {
+    e.preventDefault();
+    
+    if (!newEnquiry.customer_name || !newEnquiry.phone) {
+      showToast && showToast('Please fill in required fields', 'error');
+      return;
+    }
+
+    try {
+      await apiRequest('/api/enquiries', {
+        method: 'POST',
+        body: JSON.stringify(newEnquiry)
+      });
+      
+      showToast && showToast('✅ Enquiry created successfully!', 'success');
+      setShowCreateModal(false);
+      setNewEnquiry({
+        customer_name: '',
+        phone: '',
+        email: '',
+        product_interest: '',
+        source: 'field_visit',
+        priority: 'WARM',
+        notes: ''
+      });
+      await loadEnquiries();
+    } catch (error) {
+      console.error('Failed to create enquiry:', error);
+      showToast && showToast('Failed to create enquiry', 'error');
+    }
+  };
+
   if (loading) {
     return <div className="page-header"><h2 className="page-title">Loading...</h2></div>;
   }
@@ -78,6 +121,35 @@ export default function Enquiries() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <button
+            onClick={() => setShowCreateModal(true)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 20px',
+              fontSize: '14px',
+              fontWeight: 600,
+              borderRadius: '8px',
+              border: 'none',
+              cursor: 'pointer',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: '#ffffff',
+              boxShadow: '0 2px 8px rgba(102, 126, 234, 0.3)',
+              transition: 'all 0.2s'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.transform = 'translateY(-1px)';
+              e.target.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.transform = 'translateY(0)';
+              e.target.style.boxShadow = '0 2px 8px rgba(102, 126, 234, 0.3)';
+            }}
+          >
+            <span style={{ fontSize: '18px' }}>➕</span>
+            Create Enquiry
+          </button>
           <ExportButtons 
             data={filteredEnquiries} 
             filename="enquiries" 
@@ -336,6 +408,216 @@ export default function Enquiries() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Create Enquiry Modal */}
+      {showCreateModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: '#FFFFFF',
+            borderRadius: '16px',
+            maxWidth: '600px',
+            width: '100%',
+            maxHeight: '90vh',
+            overflow: 'auto',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '24px',
+              borderBottom: '1px solid #E5E7EB',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <h3 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: '#111827' }}>
+                ➕ Create New Enquiry
+              </h3>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '24px',
+                  cursor: 'pointer',
+                  color: '#6B7280',
+                  padding: '4px',
+                  lineHeight: 1
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <form onSubmit={handleCreateEnquiry} style={{ padding: '24px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                
+                {/* Customer Name */}
+                <div>
+                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 600, color: '#374151' }}>
+                    Customer Name <span style={{ color: '#EF4444' }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={newEnquiry.customer_name}
+                    onChange={(e) => setNewEnquiry({ ...newEnquiry, customer_name: e.target.value })}
+                    required
+                    placeholder="Enter customer name"
+                  />
+                </div>
+
+                {/* Phone */}
+                <div>
+                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 600, color: '#374151' }}>
+                    Phone Number <span style={{ color: '#EF4444' }}>*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    className="form-control"
+                    value={newEnquiry.phone}
+                    onChange={(e) => setNewEnquiry({ ...newEnquiry, phone: e.target.value })}
+                    required
+                    placeholder="Enter phone number"
+                  />
+                </div>
+
+                {/* Email */}
+                <div>
+                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 600, color: '#374151' }}>
+                    Email (Optional)
+                  </label>
+                  <input
+                    type="email"
+                    className="form-control"
+                    value={newEnquiry.email}
+                    onChange={(e) => setNewEnquiry({ ...newEnquiry, email: e.target.value })}
+                    placeholder="customer@example.com"
+                  />
+                </div>
+
+                {/* Product Interest */}
+                <div>
+                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 600, color: '#374151' }}>
+                    Product Interest
+                  </label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={newEnquiry.product_interest}
+                    onChange={(e) => setNewEnquiry({ ...newEnquiry, product_interest: e.target.value })}
+                    placeholder="e.g., HP LaserJet Printer"
+                  />
+                </div>
+
+                {/* Priority */}
+                <div>
+                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 600, color: '#374151' }}>
+                    Priority
+                  </label>
+                  <select
+                    className="form-control"
+                    value={newEnquiry.priority}
+                    onChange={(e) => setNewEnquiry({ ...newEnquiry, priority: e.target.value })}
+                  >
+                    <option value="HOT">🔥 Hot</option>
+                    <option value="WARM">🌡️ Warm</option>
+                    <option value="COLD">❄️ Cold</option>
+                  </select>
+                </div>
+
+                {/* Source */}
+                <div>
+                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 600, color: '#374151' }}>
+                    Source
+                  </label>
+                  <select
+                    className="form-control"
+                    value={newEnquiry.source}
+                    onChange={(e) => setNewEnquiry({ ...newEnquiry, source: e.target.value })}
+                  >
+                    <option value="field_visit">🚶 Field Visit</option>
+                    <option value="phone">📞 Phone Call</option>
+                    <option value="walk-in">🚪 Walk-in</option>
+                    <option value="website">🌐 Website</option>
+                    <option value="referral">👥 Referral</option>
+                  </select>
+                </div>
+
+                {/* Notes */}
+                <div>
+                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 600, color: '#374151' }}>
+                    Notes
+                  </label>
+                  <textarea
+                    className="form-control"
+                    value={newEnquiry.notes}
+                    onChange={(e) => setNewEnquiry({ ...newEnquiry, notes: e.target.value })}
+                    placeholder="Additional details about the enquiry..."
+                    rows="3"
+                    style={{ resize: 'vertical' }}
+                  />
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div style={{
+                marginTop: '24px',
+                display: 'flex',
+                gap: '12px',
+                justifyContent: 'flex-end'
+              }}>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  style={{
+                    padding: '10px 24px',
+                    borderRadius: '8px',
+                    border: '1px solid #D1D5DB',
+                    background: '#FFFFFF',
+                    color: '#374151',
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  style={{
+                    padding: '10px 24px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    color: '#FFFFFF',
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 8px rgba(102, 126, 234, 0.3)',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  Create Enquiry
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

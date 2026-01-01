@@ -145,13 +145,64 @@ const DailyStart = () => {
             const minutes = now.getMinutes();
             const isLate = hours > 9 || (hours === 9 && minutes > 30);
 
+            // Get detailed address using reverse geocoding
+            let detailedLocation = 'Field Location';
+            try {
+              const geoResponse = await fetch(
+                `https://nominatim.openstreetmap.org/reverse?` +
+                `lat=${position.coords.latitude}&` +
+                `lon=${position.coords.longitude}&` +
+                `format=json&` +
+                `addressdetails=1&` +
+                `zoom=18`,
+                {
+                  headers: {
+                    'User-Agent': 'YaminiInfotech/1.0'
+                  }
+                }
+              );
+              
+              if (geoResponse.ok) {
+                const geoData = await geoResponse.json();
+                const addr = geoData.address;
+                
+                // Build detailed address: Area/Colony, Road/Street, City
+                const parts = [];
+                
+                // Add area/colony/suburb
+                if (addr.suburb || addr.neighbourhood || addr.quarter) {
+                  parts.push(addr.suburb || addr.neighbourhood || addr.quarter);
+                }
+                
+                // Add road/street
+                if (addr.road) {
+                  parts.push(addr.road);
+                }
+                
+                // Add city/town/village
+                if (addr.city || addr.town || addr.village) {
+                  parts.push(addr.city || addr.town || addr.village);
+                }
+                
+                // Add state
+                if (addr.state) {
+                  parts.push(addr.state);
+                }
+                
+                detailedLocation = parts.length > 0 ? parts.join(', ') : geoData.display_name;
+              }
+            } catch (geoError) {
+              console.warn('Reverse geocoding failed, using coordinates:', geoError);
+              detailedLocation = `${position.coords.latitude.toFixed(6)}, ${position.coords.longitude.toFixed(6)}`;
+            }
+
             const formData = new FormData();
             formData.append('photo', photoFile);
             formData.append('latitude', position.coords.latitude.toString());
             formData.append('longitude', position.coords.longitude.toString());
             formData.append('attendance_status', isLate ? 'Late' : 'Present');
             formData.append('time', now.toLocaleTimeString());
-            formData.append('location', 'Field Location');
+            formData.append('location', detailedLocation);
 
             // Get token from localStorage yamini_user
             const user = JSON.parse(localStorage.getItem('yamini_user') || '{}');
@@ -193,31 +244,12 @@ const DailyStart = () => {
           }
         },
         (error) => {
-          console.error('Geolocation error:', error);
-          setCheckingIn(false);
-          
-          let errorMessage = '📍 Location Error: ';
-          switch(error.code) {
-            case error.PERMISSION_DENIED:
-              errorMessage += 'Please allow location access in your browser.\n\n';
-              errorMessage += '1. Click the 🔒 icon in the address bar\n';
-              errorMessage += '2. Enable "Location" permission\n';
-              errorMessage += '3. Reload the page and try again';
-              break;
-            case error.POSITION_UNAVAILABLE:
-              errorMessage += 'Location information is unavailable. Please check your device settings.';
-              break;
-            case error.TIMEOUT:
-              errorMessage += 'Location request timed out. Please try again.';
-              break;
-            default:
-              errorMessage += 'An unknown error occurred getting your location.';
-          }
-          alert(errorMessage);
+          console.warn('GPS location unavailable:', error);
+          // Continue with attendance marking even without location
         },
         {
           enableHighAccuracy: true,
-          timeout: 15000,
+          timeout: 30000,  // Increased to 30 seconds for better accuracy
           maximumAge: 0
         }
       );

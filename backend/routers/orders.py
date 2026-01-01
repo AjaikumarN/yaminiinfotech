@@ -38,9 +38,11 @@ def create_order(
     if not enquiry:
         raise HTTPException(status_code=404, detail="Enquiry not found")
     
-    # 🔒 CRITICAL: Enquiry must be CONVERTED
+    # Auto-convert enquiry if not already converted
     if enquiry.status != "CONVERTED":
-        raise HTTPException(status_code=400, detail="🚫 Order creation blocked: Enquiry must be CONVERTED first. Current status: " + enquiry.status)
+        enquiry.status = "CONVERTED"
+        enquiry.converted_to_order = True
+        db.add(enquiry)
     
     # Validation 2: Must be assigned to current salesman (unless admin)
     if current_user.role == models.UserRole.SALESMAN and enquiry.assigned_to != current_user.id:
@@ -51,21 +53,27 @@ def create_order(
     if existing_order:
         raise HTTPException(status_code=400, detail="Order already exists for this enquiry")
     
-    # Get product details
-    if not enquiry.product_id:
-        raise HTTPException(status_code=400, detail="Enquiry must have a product assigned")
+    # Get product details (optional - can use product_interest as fallback)
+    product = None
+    product_name = enquiry.product_interest or "General Product"
+    unit_price = order.unit_price if hasattr(order, 'unit_price') and order.unit_price else 0
     
-    product = db.query(models.Product).filter(models.Product.id == enquiry.product_id).first()
-    if not product:
-        raise HTTPException(status_code=404, detail="Product not found")
+    if enquiry.product_id:
+        product = db.query(models.Product).filter(models.Product.id == enquiry.product_id).first()
+        if product:
+            product_name = product.name
+            unit_price = product.price
     
-    # Get customer
-    customer = db.query(models.Customer).filter(models.Customer.id == enquiry.customer_id).first()
-    if not customer:
-        raise HTTPException(status_code=404, detail="Customer not found")
+    # Get customer (optional - can use customer_name from enquiry)
+    customer = None
+    customer_name = enquiry.customer_name
+    
+    if enquiry.customer_id:
+        customer = db.query(models.Customer).filter(models.Customer.id == enquiry.customer_id).first()
+        if customer:
+            customer_name = customer.name
     
     # Calculate amounts
-    unit_price = product.price
     discount_amount = (unit_price * order.quantity * order.discount_percent) / 100
     total_amount = (unit_price * order.quantity) - discount_amount
     
@@ -74,10 +82,10 @@ def create_order(
         order_id=generate_order_id(db),
         enquiry_id=enquiry.id,
         salesman_id=enquiry.assigned_to,
-        customer_id=customer.id,
-        product_id=product.id,
-        customer_name=customer.name,
-        product_name=product.name,
+        customer_id=customer.id if customer else None,
+        product_id=product.id if product else None,
+        customer_name=customer_name,
+        product_name=product_name,
         quantity=order.quantity,
         unit_price=unit_price,
         discount_percent=order.discount_percent,

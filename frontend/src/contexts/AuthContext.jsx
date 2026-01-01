@@ -98,6 +98,21 @@ export function AuthProvider({ children }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [loading, setLoading] = useState(true)
 
+  // Helper to get full photo URL
+  const getPhotoUrl = (photograph) => {
+    if (!photograph) return null;
+    // If it's already a full URL, return it
+    if (photograph.startsWith('http://') || photograph.startsWith('https://')) {
+      return photograph;
+    }
+    // If it's a relative path, prepend backend URL
+    if (photograph.startsWith('/uploads/')) {
+      return `http://localhost:8000${photograph}`;
+    }
+    // If it's just a path without leading slash
+    return `http://localhost:8000/uploads/employees/${photograph}`;
+  };
+
   // Check for existing session on mount
   useEffect(() => {
     const savedUser = localStorage.getItem('yamini_user')
@@ -106,6 +121,13 @@ export function AuthProvider({ children }) {
         const parsedUser = JSON.parse(savedUser)
         // Verify token exists
         if (parsedUser.token) {
+          // Add photo alias if not already present
+          const photoUrl = getPhotoUrl(parsedUser.photograph || parsedUser.photo);
+          parsedUser.photo = photoUrl;
+          
+          if (!parsedUser.name && parsedUser.full_name) {
+            parsedUser.name = parsedUser.full_name
+          }
           setUser(parsedUser)
           setIsAuthenticated(true)
         } else {
@@ -125,10 +147,18 @@ export function AuthProvider({ children }) {
       const response = await authAPI.login(username, password)
       
       // response contains: { access_token, token_type, user }
+      const photoUrl = getPhotoUrl(response.user.photograph || response.user.photo);
+      
       const userWithToken = {
         ...response.user,
-        token: response.access_token
+        token: response.access_token,
+        // Add photo alias with full URL
+        photo: photoUrl,
+        photograph: photoUrl,
+        name: response.user.full_name || response.user.name || response.user.username
       }
+      
+      console.log('Login user photo URL:', photoUrl); // Debug log
       
       setUser(userWithToken)
       setIsAuthenticated(true)

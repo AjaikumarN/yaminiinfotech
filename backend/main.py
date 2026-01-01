@@ -1,9 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 import models
 from database import engine
 from scheduler import start_scheduler, stop_scheduler
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 # Import routers
 from routers import auth_routes
@@ -30,6 +32,8 @@ from routers import stock_movements
 from routers import analytics
 from routers import invoices
 from routers import settings
+from routers import chatbot
+from routers import verified_attendance
 
 
 # Lifespan context manager for startup/shutdown
@@ -95,6 +99,13 @@ app.include_router(stock_movements.router)
 app.include_router(analytics.router)
 app.include_router(invoices.router)
 app.include_router(settings.router)
+app.include_router(chatbot.router)
+app.include_router(verified_attendance.router)
+
+# Mount static files for uploads
+upload_dir = Path("uploads")
+upload_dir.mkdir(exist_ok=True)
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 @app.get("/")
 def read_root():

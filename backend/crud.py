@@ -59,8 +59,8 @@ def get_customer(db: Session, customer_id: int):
 def create_enquiry(db: Session, enquiry: schemas.EnquiryCreate, created_by: str):
     enquiry_id = generate_id("ENQ", db, models.Enquiry, "enquiry_id")
     
-    # Convert Pydantic model to dict
-    enquiry_data = enquiry.dict()
+    # Convert Pydantic model to dict, excluding None values
+    enquiry_data = enquiry.dict(exclude_none=True)
     
     # If product_id is provided, fetch product name
     if enquiry_data.get('product_id'):
@@ -70,12 +70,13 @@ def create_enquiry(db: Session, enquiry: schemas.EnquiryCreate, created_by: str)
         if product:
             enquiry_data['product_interest'] = product.name
     
-    # Handle description field (map to notes)
-    if 'description' in enquiry_data and enquiry_data['description']:
-        if enquiry_data.get('notes'):
-            enquiry_data['notes'] += f"\n\nCustomer Message: {enquiry_data['description']}"
-        else:
-            enquiry_data['notes'] = enquiry_data['description']
+    # Handle description field (map to notes) - remove it from data
+    if 'description' in enquiry_data:
+        if enquiry_data['description']:
+            if enquiry_data.get('notes'):
+                enquiry_data['notes'] += f"\n\nCustomer Message: {enquiry_data['description']}"
+            else:
+                enquiry_data['notes'] = enquiry_data['description']
         del enquiry_data['description']
     
     db_enquiry = models.Enquiry(

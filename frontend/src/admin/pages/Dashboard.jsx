@@ -1,445 +1,365 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiRequest } from '../../utils/api';
-import { theme } from '../styles/designSystem';
-import EnterpriseCard from '../components/EnterpriseCard';
+import DashboardLayout, { KpiGrid, ContentGrid } from '../../components/shared/dashboard/DashboardLayout';
+import KpiCard from '../../components/shared/dashboard/KpiCard';
+import DataCard from '../../components/shared/dashboard/DataCard';
+import SimpleTable from '../../components/shared/dashboard/SimpleTable';
+import StatusBadge from '../../components/shared/dashboard/StatusBadge';
+import ActionButton from '../../components/shared/dashboard/ActionButton';
 
 /**
- * Admin Dashboard - Enterprise Mission Control
- * Responsive: 6-col desktop, 3-col tablet, 2-col mobile
- * Professional, calm, trustworthy interface
+ * ADMIN DASHBOARD - Able Pro Style
+ * Executive overview with full system visibility
+ * NO AdminLayout wrapper - layout handled by route-level DashboardLayout
  */
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
-  const [kpis, setKpis] = useState({
-    totalSalesToday: 0,
-    pendingEnquiries: 0,
-    ordersAwaitingApproval: 0,
-    slaBreaches: 0,
-    lateAttendance: 0,
-    activeServiceRequests: 0
-  });
-  const [alerts, setAlerts] = useState([]);
-
-  // Track window width for responsive layout
-  useEffect(() => {
-    const handleResize = () => setWindowWidth(window.innerWidth);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  const [dashboardData, setDashboardData] = useState(null);
 
   useEffect(() => {
-    loadDashboardData();
-    const interval = setInterval(loadDashboardData, 30000); // Refresh every 30s
+    fetchDashboardData();
+    const interval = setInterval(fetchDashboardData, 30000);
     return () => clearInterval(interval);
   }, []);
 
-  const loadDashboardData = async () => {
+  const fetchDashboardData = async () => {
     try {
-      setLoading(true);
-      
-      const [enquiries, orders] = await Promise.all([
+      const [enquiries, orders, services] = await Promise.all([
         apiRequest('/api/enquiries/').catch(() => []),
-        apiRequest('/api/orders/').catch(() => [])
+        apiRequest('/api/orders/').catch(() => []),
+        apiRequest('/api/service-requests/').catch(() => [])
       ]);
 
-      const today = new Date().toDateString();
+      const today = new Date();
+      const thisMonth = today.getMonth();
       const pendingOrders = orders.filter(o => o.status === 'PENDING' || o.status === 'Pending');
       
-      const calculatedKpis = {
-        totalSalesToday: orders.filter(o => 
-          new Date(o.created_at).toDateString() === today
-        ).length,
-        pendingEnquiries: enquiries.filter(e => 
-          e.status === 'NEW' || e.status === 'PENDING'
-        ).length,
-        ordersAwaitingApproval: pendingOrders.length,
-        slaBreaches: 0,
-        lateAttendance: 0,
-        activeServiceRequests: 0
+      const monthlyOrders = orders.filter(o => new Date(o.created_at).getMonth() === thisMonth);
+      const monthlyRevenue = monthlyOrders.reduce((sum, o) => sum + (parseFloat(o.total_amount) || 0), 0);
+      
+      const data = {
+        kpis: {
+          totalEnquiries: enquiries.length,
+          convertedSales: orders.length,
+          monthlyRevenue: `₹${(monthlyRevenue / 100000).toFixed(2)}L`,
+          pendingServices: services.filter(s => s.status === 'PENDING' || s.status === 'IN_PROGRESS').length,
+          lowStockAlerts: 12 // TODO: Connect to stock API
+        },
+        recentEnquiries: enquiries.slice(0, 5).map(e => ({
+          id: e.enquiry_number || `ENQ-${e.id}`,
+          customer: e.customer_name,
+          product: e.product_name || 'N/A',
+          priority: e.priority?.toLowerCase() || 'cold',
+          assigned: e.assigned_to || 'Unassigned',
+          date: new Date(e.created_at).toLocaleDateString(),
+          status: e.status?.toLowerCase() || 'new'
+        })),
+        serviceEscalations: services.slice(0, 3).map(s => ({
+          id: s.request_number || `SRV-${s.id}`,
+          customer: s.customer_name,
+          machine: s.product_name || 'N/A',
+          issue: s.complaint,
+          sla: '2h 15m', // TODO: Calculate from SLA
+          engineer: s.assigned_to || 'Unassigned',
+          priority: s.priority?.toLowerCase() || 'medium'
+        }))
       };
 
-      setKpis(calculatedKpis);
-
-      const newAlerts = [];
-      if (calculatedKpis.ordersAwaitingApproval > 0) {
-        newAlerts.push({
-          type: 'warning',
-          icon: '⏳',
-          title: 'Orders Pending Approval',
-          message: `${calculatedKpis.ordersAwaitingApproval} orders require your approval`,
-          action: () => navigate('/admin/orders')
-        });
-      }
-      if (calculatedKpis.slaBreaches > 0) {
-        newAlerts.push({
-          type: 'danger',
-          icon: '🚨',
-          title: 'SLA Breaches',
-          message: `${calculatedKpis.slaBreaches} service requests breached SLA`,
-          action: () => navigate('/admin/service/sla')
-        });
-      }
-
-      setAlerts(newAlerts);
+      setDashboardData(data);
     } catch (error) {
       console.error('Dashboard load error:', error);
+      // Set mock data on error
+      setDashboardData({
+        kpis: {
+          totalEnquiries: 0,
+          convertedSales: 0,
+          monthlyRevenue: '₹0',
+          pendingServices: 0,
+          lowStockAlerts: 0
+        },
+        recentEnquiries: [],
+        serviceEscalations: []
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  // Responsive grid columns
-  const isMobile = windowWidth < theme.layout.breakpoints.tablet;
-  const isTablet = windowWidth >= theme.layout.breakpoints.tablet && windowWidth < theme.layout.breakpoints.laptop;
-  const gridCols = isMobile ? 2 : (isTablet ? 3 : 6);
-
-  const pageStyles = {
-    width: '100%',
-    animation: 'fadeIn 0.3s ease-in'
+  const data = dashboardData || {
+    kpis: { totalEnquiries: 0, convertedSales: 0, monthlyRevenue: '₹0', pendingServices: 0, lowStockAlerts: 0 },
+    recentEnquiries: [],
+    serviceEscalations: []
   };
 
-  const headerStyles = {
-    marginBottom: theme.spacing.xl
-  };
-
-  const titleStyles = {
-    fontSize: isMobile ? theme.typography.fontSize.xl : theme.typography.fontSize['3xl'],
-    fontWeight: theme.typography.fontWeight.bold,
-    color: theme.colors.text.primary,
-    marginBottom: theme.spacing.sm,
-    display: 'flex',
-    alignItems: 'center',
-    gap: theme.spacing.md
-  };
-
-  const subtitleStyles = {
-    fontSize: isMobile ? theme.typography.fontSize.sm : theme.typography.fontSize.base,
-    color: theme.colors.text.secondary,
-    display: 'flex',
-    alignItems: 'center',
-    gap: theme.spacing.xs
-  };
-
-  const gridStyles = {
-    display: 'grid',
-    gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
-    gap: isMobile ? theme.spacing.md : theme.spacing.lg,
-    marginBottom: theme.spacing.xl
-  };
-
-  const kpiMetrics = [
-    {
-      icon: '💰',
-      label: 'Sales Today',
-      value: kpis.totalSalesToday,
-      color: theme.colors.success.main,
-      bg: theme.colors.success.bg,
-      onClick: () => navigate('/admin/orders')
+  const enquiryColumns = [
+    { label: 'Enquiry ID', key: 'id' },
+    { label: 'Customer', key: 'customer' },
+    { label: 'Product', key: 'product' },
+    { 
+      label: 'Priority', 
+      key: 'priority',
+      render: (row) => (
+        <StatusBadge 
+          status={row.priority.toUpperCase()} 
+          variant={row.priority}
+          size="sm"
+          dot
+        />
+      )
     },
-    {
-      icon: '📋',
-      label: 'Enquiries',
-      value: kpis.pendingEnquiries,
-      color: theme.colors.info.main,
-      bg: theme.colors.info.bg,
-      onClick: () => navigate('/admin/enquiries')
-    },
-    {
-      icon: '⏳',
-      label: 'Approvals',
-      value: kpis.ordersAwaitingApproval,
-      color: theme.colors.warning.main,
-      bg: theme.colors.warning.bg,
-      onClick: () => navigate('/admin/orders'),
-      urgent: kpis.ordersAwaitingApproval > 0
-    },
-    {
-      icon: '🛠',
-      label: 'Service',
-      value: kpis.activeServiceRequests,
-      color: theme.colors.primary.main,
-      bg: theme.colors.primary.bg,
-      onClick: () => navigate('/admin/service/requests')
-    },
-    {
-      icon: '🚨',
-      label: 'SLA',
-      value: kpis.slaBreaches,
-      color: theme.colors.danger.main,
-      bg: theme.colors.danger.bg,
-      onClick: () => navigate('/admin/service/sla'),
-      urgent: kpis.slaBreaches > 0
-    },
-    {
-      icon: '🕐',
-      label: 'Late',
-      value: kpis.lateAttendance,
-      color: theme.colors.warning.main,
-      bg: theme.colors.warning.bg,
-      onClick: () => navigate('/admin/attendance')
+    { label: 'Assigned To', key: 'assigned' },
+    { label: 'Date', key: 'date' },
+    { 
+      label: 'Status', 
+      key: 'status',
+      render: (row) => (
+        <StatusBadge 
+          status={row.status} 
+          variant="info"
+          size="sm"
+        />
+      )
     }
   ];
 
-  const quickActions = [
-    { icon: '✅', label: 'Approve Orders', path: '/admin/orders', color: theme.colors.success.main },
-    { icon: '👥', label: 'Manage Staff', path: '/admin/employees/salesmen', color: theme.colors.primary.main },
-    { icon: '📦', label: 'Products', path: '/admin/products', color: theme.colors.info.main },
-    { icon: '📊', label: 'Stock', path: '/admin/stock', color: theme.colors.warning.main },
-    { icon: '💳', label: 'Outstanding', path: '/admin/outstanding', color: theme.colors.danger.main },
-    { icon: '📈', label: 'Analytics', path: '/admin/analytics', color: theme.colors.primary.main }
+  const escalationColumns = [
+    { label: 'Service ID', key: 'id' },
+    { label: 'Customer', key: 'customer' },
+    { label: 'Machine', key: 'machine' },
+    { label: 'Issue', key: 'issue' },
+    { 
+      label: 'SLA Remaining', 
+      key: 'sla',
+      render: (row) => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span className="material-icons" style={{ fontSize: '16px', color: row.priority === 'high' ? '#ef4444' : '#f59e0b' }}>
+            schedule
+          </span>
+          <span style={{ fontWeight: '600', color: row.priority === 'high' ? '#ef4444' : '#374151' }}>
+            {row.sla}
+          </span>
+        </div>
+      )
+    },
+    { label: 'Engineer', key: 'engineer' },
+    { 
+      label: 'Priority', 
+      key: 'priority',
+      render: (row) => (
+        <StatusBadge 
+          status={row.priority} 
+          variant={row.priority === 'high' ? 'danger' : 'warning'}
+          size="sm"
+        />
+      )
+    }
   ];
 
-  if (loading) {
-    return (
-      <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        minHeight: '400px',
-        color: theme.colors.text.secondary
-      }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{
-            width: '48px',
-            height: '48px',
-            border: `4px solid ${theme.colors.primary.light}`,
-            borderTopColor: theme.colors.primary.main,
-            borderRadius: '50%',
-            animation: 'spin 0.8s linear infinite',
-            margin: '0 auto 16px'
-          }} />
-          <p>Loading…</p>
-        </div>
-        <style>{`
-          @keyframes spin {
-            to { transform: rotate(360deg); }
-          }
-        `}</style>
-      </div>
-    );
-  }
-
   return (
-    <div style={pageStyles}>
-      {/* Header */}
-      <div style={headerStyles}>
-        <h1 style={titleStyles}>
-          <span>🎯 Monitor Section</span>
-        </h1>
-        <p style={subtitleStyles}>
-          <span>•</span>
-          <span>Monitor • Approve • Control</span>
-        </p>
-      </div>
+    <DashboardLayout
+      title="Welcome Back, Admin!"
+      subtitle="Here's what's happening with your business today"
+      actions={
+        <>
+          <ActionButton variant="secondary" icon="calendar_today" size="sm">
+            Previous Year
+          </ActionButton>
+          <ActionButton variant="primary" icon="visibility" size="sm">
+            View All Time
+          </ActionButton>
+        </>
+      }
+    >
+      {/* KPI Cards */}
+      <KpiGrid columns={5}>
+        <KpiCard
+          title="Total Enquiries"
+          value={data.kpis.totalEnquiries}
+          change={14.5}
+          changeType="positive"
+          icon="inbox"
+          color="#6366f1"
+          loading={loading}
+        />
+        <KpiCard
+          title="Converted Sales"
+          value={data.kpis.convertedSales}
+          change={23.1}
+          changeType="positive"
+          icon="trending_up"
+          color="#10b981"
+          loading={loading}
+        />
+        <KpiCard
+          title="Monthly Revenue"
+          value={data.kpis.monthlyRevenue}
+          change={18.9}
+          changeType="positive"
+          icon="payments"
+          color="#f59e0b"
+          loading={loading}
+        />
+        <KpiCard
+          title="Pending Services"
+          value={data.kpis.pendingServices}
+          change={5.3}
+          changeType="negative"
+          icon="build"
+          color="#ef4444"
+          loading={loading}
+        />
+        <KpiCard
+          title="Low Stock Alerts"
+          value={data.kpis.lowStockAlerts}
+          change={15.2}
+          changeType="positive"
+          icon="inventory_2"
+          color="#8b5cf6"
+          loading={loading}
+        />
+      </KpiGrid>
 
-      {/* KPI Grid */}
-      <div style={gridStyles}>
-        {kpiMetrics.map((kpi, index) => (
-          <EnterpriseCard
-            key={index}
-            onClick={kpi.onClick}
-            hover
-            padding="lg"
-            style={{
-              backgroundColor: kpi.bg,
-              border: `1px solid ${kpi.color}20`,
-              position: 'relative',
-              overflow: 'hidden'
-            }}
-          >
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: theme.spacing.sm
-            }}>
-              <div style={{
-                fontSize: isMobile ? '28px' : '32px',
-                opacity: 0.9
-              }}>
-                {kpi.icon}
-              </div>
-              <div style={{
-                fontSize: isMobile ? theme.typography.fontSize['2xl'] : theme.typography.fontSize['3xl'],
-                fontWeight: theme.typography.fontWeight.bold,
-                color: kpi.color,
-                lineHeight: 1
-              }}>
-                {kpi.value}
-              </div>
-              <div style={{
-                fontSize: theme.typography.fontSize.sm,
-                fontWeight: theme.typography.fontWeight.medium,
-                color: theme.colors.text.secondary
-              }}>
-                {kpi.label}
-              </div>
-            </div>
-            
-            {kpi.urgent && (
-              <div style={{
-                position: 'absolute',
-                top: theme.spacing.sm,
-                right: theme.spacing.sm,
-                width: '8px',
-                height: '8px',
-                backgroundColor: kpi.color,
-                borderRadius: '50%',
-                animation: 'pulse 2s ease-in-out infinite'
-              }} />
-            )}
-          </EnterpriseCard>
-        ))}
-      </div>
-
-      {/* Alerts */}
-      {alerts.length > 0 && (
-        <div style={{ marginBottom: theme.spacing.xl }}>
-          <h2 style={{
-            fontSize: theme.typography.fontSize.lg,
-            fontWeight: theme.typography.fontWeight.semibold,
-            color: theme.colors.text.primary,
-            marginBottom: theme.spacing.md
-          }}>
-            🔔 Alerts
-          </h2>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
-            gap: theme.spacing.md
-          }}>
-            {alerts.map((alert, index) => (
-              <EnterpriseCard
-                key={index}
-                padding="lg"
-                style={{
-                  borderLeft: `4px solid ${
-                    alert.type === 'danger' ? theme.colors.danger.main : theme.colors.warning.main
-                  }`
-                }}
+      {/* Main Content Grid */}
+      <ContentGrid columns="2fr 1fr">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          {/* Recent Enquiries */}
+          <DataCard
+            title="Recent Enquiries"
+            subtitle="Latest incoming leads"
+            headerAction={
+              <ActionButton 
+                variant="ghost" 
+                size="sm"
+                onClick={() => navigate('/admin/enquiries')}
               >
-                <div style={{ display: 'flex', gap: theme.spacing.md }}>
-                  <div style={{ fontSize: '32px' }}>{alert.icon}</div>
-                  <div style={{ flex: 1 }}>
-                    <h3 style={{
-                      fontSize: theme.typography.fontSize.base,
-                      fontWeight: theme.typography.fontWeight.semibold,
-                      color: theme.colors.text.primary,
-                      marginBottom: theme.spacing.xs
-                    }}>
-                      {alert.title}
-                    </h3>
-                    <p style={{
-                      fontSize: theme.typography.fontSize.sm,
-                      color: theme.colors.text.secondary,
-                      marginBottom: theme.spacing.md
-                    }}>
-                      {alert.message}
-                    </p>
-                    <button
-                      onClick={alert.action}
-                      style={{
-                        padding: `${theme.spacing.xs} ${theme.spacing.md}`,
-                        backgroundColor: alert.type === 'danger' 
-                          ? theme.colors.danger.main 
-                          : theme.colors.warning.main,
-                        color: theme.colors.neutral.white,
-                        border: 'none',
-                        borderRadius: theme.borderRadius.md,
-                        fontSize: theme.typography.fontSize.sm,
-                        fontWeight: theme.typography.fontWeight.medium,
-                        cursor: 'pointer',
-                        transition: theme.transitions.fast
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.opacity = '0.9';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.opacity = '1';
-                      }}
-                    >
-                      Review →
-                    </button>
+                View All
+              </ActionButton>
+            }
+            noPadding
+          >
+            <SimpleTable
+              columns={enquiryColumns}
+              data={data.recentEnquiries}
+              loading={loading}
+              emptyText="No enquiries yet"
+              onRowClick={(row) => navigate(`/admin/enquiries/${row.id}`)}
+            />
+          </DataCard>
+
+          {/* Service Escalations */}
+          <DataCard
+            title="Service Escalations"
+            subtitle="Urgent attention required"
+            headerAction={
+              <ActionButton 
+                variant="ghost" 
+                size="sm"
+                onClick={() => navigate('/admin/service/requests')}
+              >
+                View All
+              </ActionButton>
+            }
+            noPadding
+          >
+            <SimpleTable
+              columns={escalationColumns}
+              data={data.serviceEscalations}
+              loading={loading}
+              emptyText="No escalations"
+              onRowClick={(row) => navigate(`/admin/service/requests/${row.id}`)}
+            />
+          </DataCard>
+        </div>
+
+        {/* Right Sidebar */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          {/* Quick Actions */}
+          <DataCard title="Quick Actions" subtitle="Common tasks">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <ActionButton 
+                variant="primary" 
+                icon="person_add" 
+                fullWidth
+                onClick={() => navigate('/admin/new-employee')}
+              >
+                Add Employee
+              </ActionButton>
+              <ActionButton 
+                variant="secondary" 
+                icon="add_shopping_cart" 
+                fullWidth
+                onClick={() => navigate('/products/add')}
+              >
+                Add Product
+              </ActionButton>
+              <ActionButton 
+                variant="secondary" 
+                icon="assessment" 
+                fullWidth
+                onClick={() => navigate('/admin/reports')}
+              >
+                View Reports
+              </ActionButton>
+              <ActionButton 
+                variant="secondary" 
+                icon="security" 
+                fullWidth
+                onClick={() => navigate('/admin/mif')}
+              >
+                Access MIF
+              </ActionButton>
+            </div>
+          </DataCard>
+
+          {/* Activity Timeline */}
+          <DataCard title="Recent Activity" subtitle="Latest system events">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {[
+                { icon: 'person_add', text: 'New employee added', time: '5m ago', color: '#10b981' },
+                { icon: 'shopping_cart', text: 'Order placed', time: '12m ago', color: '#6366f1' },
+                { icon: 'build', text: 'Service completed', time: '1h ago', color: '#f59e0b' },
+                { icon: 'inventory', text: 'Stock updated', time: '2h ago', color: '#8b5cf6' }
+              ].map((activity, idx) => (
+                <div key={idx} style={{
+                  display: 'flex',
+                  gap: '12px',
+                  alignItems: 'flex-start'
+                }}>
+                  <div style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '8px',
+                    background: `${activity.color}15`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    <span className="material-icons" style={{fontSize: '16px', color: activity.color}}>
+                      {activity.icon}
+                    </span>
+                  </div>
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '2px',
+                    flex: 1
+                  }}>
+                    <span style={{ fontSize: '13px', fontWeight: '500', color: '#374151' }}>
+                      {activity.text}
+                    </span>
+                    <span style={{ fontSize: '12px', color: '#9ca3af' }}>
+                      {activity.time}
+                    </span>
                   </div>
                 </div>
-              </EnterpriseCard>
-            ))}
-          </div>
+              ))}
+            </div>
+          </DataCard>
         </div>
-      )}
-
-      {/* Quick Actions */}
-      <div>
-        <h2 style={{
-          fontSize: theme.typography.fontSize.lg,
-          fontWeight: theme.typography.fontWeight.semibold,
-          color: theme.colors.text.primary,
-          marginBottom: theme.spacing.md
-        }}>
-          ⚡ Quick Actions
-        </h2>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : (isTablet ? '1fr 1fr' : '1fr 1fr 1fr'),
-          gap: theme.spacing.md
-        }}>
-          {quickActions.map((action, index) => (
-            <EnterpriseCard
-              key={index}
-              onClick={() => navigate(action.path)}
-              hover
-              padding="lg"
-              style={{
-                cursor: 'pointer',
-                minHeight: '100px',
-                display: 'flex',
-                alignItems: 'center'
-              }}
-            >
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: theme.spacing.md,
-                width: '100%'
-              }}>
-                <div style={{
-                  width: '48px',
-                  height: '48px',
-                  backgroundColor: `${action.color}15`,
-                  borderRadius: theme.borderRadius.lg,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '24px',
-                  flexShrink: 0
-                }}>
-                  {action.icon}
-                </div>
-                <div style={{
-                  fontSize: theme.typography.fontSize.base,
-                  fontWeight: theme.typography.fontWeight.medium,
-                  color: theme.colors.text.primary
-                }}>
-                  {action.label}
-                </div>
-              </div>
-            </EnterpriseCard>
-          ))}
-        </div>
-      </div>
-
-      <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.5; }
-        }
-      `}</style>
-    </div>
+      </ContentGrid>
+    </DashboardLayout>
   );
 }

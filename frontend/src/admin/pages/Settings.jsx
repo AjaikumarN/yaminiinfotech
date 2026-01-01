@@ -10,7 +10,9 @@ export default function Settings() {
     sla_normal_hours: 24,
     sla_urgent_hours: 6,
     sla_critical_hours: 2,
-    attendance_cutoff_time: '09:30'
+    attendance_cutoff_time: '09:30',
+    ai_model_enabled: true,
+    ai_model_name: 'Claude Haiku 4.5'
   });
   const [saving, setSaving] = useState(false);
 
@@ -148,7 +150,8 @@ export default function Settings() {
               {[ 
                 { label: 'Company Profile', value: 'Complete', accent: 'linear-gradient(135deg,#e0f2fe,#dbeafe)' },
                 { label: 'SLA Bands', value: `${settings.sla_normal_hours}/${settings.sla_urgent_hours}/${settings.sla_critical_hours} hrs`, accent: 'linear-gradient(135deg,#dcfce7,#bbf7d0)' },
-                { label: 'Attendance Cutoff', value: settings.attendance_cutoff_time, accent: 'linear-gradient(135deg,#fef3c7,#fde68a)' }
+                { label: 'Attendance Cutoff', value: settings.attendance_cutoff_time, accent: 'linear-gradient(135deg,#fef3c7,#fde68a)' },
+                { label: 'AI Model', value: settings.ai_model_enabled ? '✅ Enabled' : '❌ Disabled', accent: settings.ai_model_enabled ? 'linear-gradient(135deg,#f3e8ff,#e9d5ff)' : 'linear-gradient(135deg,#fee2e2,#fecaca)' }
               ].map((item) => (
                 <div key={item.label} style={ui.statCard(item.accent)}>
                   <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.4px', color: '#475569', fontWeight: 800 }}>{item.label}</div>
@@ -269,6 +272,65 @@ export default function Settings() {
             />
             <div style={{ fontSize: '13px', color: '#64748b', marginTop: '6px' }}>
               Employees checking in after this time will be marked as "Late".
+            </div>
+          </div>
+        </div>
+
+        <div style={ui.section}>
+          <div style={ui.sectionHeader}>
+            <span style={{ fontSize: '18px' }}>🤖</span>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: '16px', color: '#0f172a' }}>AI Model Configuration</div>
+              <div style={{ color: '#64748b', fontSize: '13px' }}>Configure AI assistant for enhanced features.</div>
+            </div>
+          </div>
+          <div style={ui.gridTwo}>
+            <div>
+              <label style={ui.label}>AI Model Name</label>
+              <input
+                type="text"
+                value={settings.ai_model_name}
+                onChange={(e) => setSettings({ ...settings, ai_model_name: e.target.value })}
+                style={ui.input}
+                disabled
+              />
+            </div>
+            <div>
+              <label style={ui.label}>Enable for All Clients</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '6px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={settings.ai_model_enabled}
+                    onChange={(e) => setSettings({ ...settings, ai_model_enabled: e.target.checked })}
+                    style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: '#6366f1' }}
+                  />
+                  <span style={{ marginLeft: '8px', fontSize: '14px', fontWeight: 600 }}>
+                    {settings.ai_model_enabled ? '✅ Enabled' : '❌ Disabled'}
+                  </span>
+                </label>
+              </div>
+            </div>
+          </div>
+          <div style={{ 
+            marginTop: '14px', 
+            background: settings.ai_model_enabled ? '#f0fdf4' : '#fef2f2', 
+            border: settings.ai_model_enabled ? '1px solid #86efac' : '1px solid #fca5a5',
+            borderRadius: '12px',
+            padding: '12px',
+            fontSize: '13px',
+            color: settings.ai_model_enabled ? '#166534' : '#991b1b'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '16px' }}>{settings.ai_model_enabled ? '✨' : '⚠️'}</span>
+              <div>
+                <strong>{settings.ai_model_enabled ? 'AI Model Active' : 'AI Model Inactive'}</strong>
+                <div style={{ marginTop: '4px' }}>
+                  {settings.ai_model_enabled 
+                    ? `${settings.ai_model_name} is now enabled for all clients. Enhanced AI features are active.`
+                    : 'AI features are disabled. Enable to use intelligent assistance capabilities.'}
+                </div>
+              </div>
             </div>
           </div>
         </div>

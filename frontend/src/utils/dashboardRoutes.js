@@ -74,11 +74,31 @@ export function isStaffRoute(path) {
  * @returns {string} Redirect path
  */
 export function getPostLoginRedirect(role, from = '/') {
-  // If coming from a staff route, go there
+  // Get the correct dashboard for this user's role
+  const userDashboard = getDashboardRoute(role)
+  
+  // If coming from a staff route, check if it matches the user's role
   if (isStaffRoute(from)) {
-    return from
+    // Extract the role prefix from the 'from' path
+    const rolePrefix = from.split('/')[1] // e.g., 'admin', 'reception', 'salesman', 'engineer'
+    
+    // Map URL prefixes to role names
+    const urlToRole = {
+      'admin': 'ADMIN',
+      'reception': 'RECEPTION',
+      'salesman': 'SALESMAN',
+      'engineer': 'SERVICE_ENGINEER'
+    }
+    
+    const fromRole = urlToRole[rolePrefix]
+    const currentRole = role?.toUpperCase()
+    
+    // Only redirect to 'from' if it matches the current user's role
+    if (fromRole === currentRole) {
+      return from
+    }
   }
   
   // Otherwise, redirect to role's dashboard
-  return getDashboardRoute(role)
+  return userDashboard
 }
